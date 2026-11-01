@@ -1,0 +1,13 @@
+# Single source of truth for Cloudflare's GitHub-connected Sanko Worker.
+# This file is intentionally at the repository root because the current
+# Cloudflare "Create and deploy" screen has no Root directory field.
+name = "sanko-chat-api"
+main = "worker/src/index.js"
+compatibility_date = "2026-10-31"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGIN = "https://socman2023.github.io"
+
+# Runtime bindings and secrets are added in the next stage.
+# Never point this Worker to Oleshka's D1 or deploy it as oleshka-chat-api.
