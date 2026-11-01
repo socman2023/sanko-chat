@@ -54,13 +54,13 @@ npm run check
 
 ## Как создать сам Worker `sanko-chat-api` в Cloudflare (bootstrap)
 
-Текущий `worker/wrangler.toml` теперь не содержит вымышленных ID ресурсов: его можно безопасно развернуть как **отдельный Worker**. Начальный `GET /health` покажет `configured:false`, а чат пока ответит `503`: это намеренно до подключения D1/KV/секретов.
+Текущий **корневой** `wrangler.toml` не содержит вымышленных ID ресурсов: его можно безопасно развернуть как **отдельный Worker**. Начальный `GET /health` покажет `configured:false`, а чат пока ответит `503`: это намеренно до подключения D1/KV/секретов.
 
 1. В Cloudflare Dashboard открыть **Workers & Pages → Create application → GitHub** (вариант **Import existing Git repository**).
 2. Выбрать GitHub-аккаунт `socman2023`, репозиторий **`sanko-chat`**, ветку **`main`**.
-3. Имя Worker: **`sanko-chat-api`** (должно точно совпадать с `name` в `worker/wrangler.toml`).
-4. **Root directory: `worker`**. Это принципиально: GitHub Pages остаётся из корня репозитория и не превращается в Worker.
-5. **Build command: оставить пустым**; **Deploy command: `npx wrangler deploy`**; выбрать **Save and Deploy**.
+3. На видимом экране **Project name** изменить с `sanko-chat` на **`sanko-chat-api`**. Это обязательное совпадение с `name` в корневом `wrangler.toml`.
+4. На текущем экране **нет поля Root directory**; не искать его. Конфигурация уже перенесена мной в **корень репозитория**, а её `main` указывает на `worker/src/index.js`. GitHub Pages остаётся прежним.
+5. **Build command: пустой**; **Deploy command: `npx wrangler deploy` (не менять)**; **Preview command: оставить как есть**, **Enable Preview builds: можно выключить** для упрощения; **Protect with Cloudflare Access: выключено**. Нажать **Deploy**.
 6. Открыть URL нового Worker и убедиться в JSON с `character: "sanko"`, `version: "sanko-worker-0.1.0"`, `configured: false`.
 7. После первого deploy можно подключать bindings и секреты, не меняя Worker Олешки.
 
@@ -69,7 +69,7 @@ npm run check
 ## Подготовка к этапу 4.3 / 4.4 (после создания Worker)
 
 1. Создать новую Cloudflare D1 **`heroes-chat-sanko`**; не касаться `heroes-chat-guard`.
-2. После создания ресурсов дополнить `worker/wrangler.toml` блоками Workers AI (`AI`), Vectorize (`KNOWLEDGE` → `heroes-knowledge`), KV (`CURRENT_CONTEXT` → `heroes-chat-current`) и D1 (`GUARD_DB` → **только новую** `heroes-chat-sanko`), с подлинными ID. Пока эти блоки намеренно отсутствуют, чтобы первый deploy прошёл без ложных значений.
+2. После создания ресурсов дополнить **корневой** `wrangler.toml` блоками Workers AI (`AI`), Vectorize (`KNOWLEDGE` → `heroes-knowledge`), KV (`CURRENT_CONTEXT` → `heroes-chat-current`) и D1 (`GUARD_DB` → **только новую** `heroes-chat-sanko`), с подлинными ID. Пока эти блоки намеренно отсутствуют, чтобы первый deploy прошёл без ложных значений.
 3. Применить схему **только к новой D1**, командой из каталога `worker`:
    `npx wrangler d1 migrations apply heroes-chat-sanko --remote`.
 4. Создать отдельный Google AI API key в собственном проекте Санко и положить его в Cloudflare Secret `GEMINI_API_KEY`; `IP_HASH_SECRET` — второй секрет, новый случайный длинный ключ. Не передавать их в чат и не класть в GitHub.
