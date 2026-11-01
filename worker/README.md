@@ -1,13 +1,13 @@
 # Cloudflare Worker Санко — шаг 4.2
 
-**Статус:** исходники созданы и тестируются в GitHub. **Не развернуто в Cloudflare.** Действующий Worker Олешки `3.9.1` и его D1 не менялись.
+**Статус:** исходники созданы в GitHub. **Сам Worker ещё предстоит создать в Cloudflare.** Первый deploy отделён от этапа подключения баз. Действующий Worker Олешки `3.9.1` и его D1 не менялись.
 
 ## Архитектура
 
 - Новый Worker: **`sanko-chat-api`**.
-- Общий Workers AI binding: **`AI`**.
-- Общий Vectorize: **`KNOWLEDGE` → `heroes-knowledge`**.
-- Общий KV: **`CURRENT_CONTEXT` → `heroes-chat-current`**, только с ключами `sanko:*`.
+- Общий Workers AI binding: **`AI`** (будет подключён после первого bootstrap-деплоя).
+- Общий Vectorize: **`KNOWLEDGE` → `heroes-knowledge`** (будет подключён после первого bootstrap-деплоя).
+- Общий KV: **`CURRENT_CONTEXT` → `heroes-chat-current`**, только с ключами `sanko:*` (будет подключён позже).
 - **Отдельная D1**: `GUARD_DB` → **`heroes-chat-sanko`** (ещё не создана).
 - Свой Gemini API key / Google AI project и отдельная финансовая учётная запись модели, по ранее принятой схеме.
 - Лимиты Санко **500 запросов в день, 15 000 в месяц, 100 с IP за день**. Лимиты Олешки неизменны и никак не расходуются обращениями к Санко.
@@ -52,10 +52,24 @@ npm run check
 
 Тесты проверяют изоляцию `shared + sanko`, датировку 29/30/31 октября, квоты 500/15 000/100, отсутствие расходов при пустом профиле, VK/Origin и работу протокола ответа. Это **локальные tests/mocks**, а не доказательство реального ответа Gemini или действующих bindings.
 
-## Подготовка к этапу 4.3 / 4.4 (не выполнять до очередного шага)
+## Как создать сам Worker `sanko-chat-api` в Cloudflare (bootstrap)
+
+Текущий `worker/wrangler.toml` теперь не содержит вымышленных ID ресурсов: его можно безопасно развернуть как **отдельный Worker**. Начальный `GET /health` покажет `configured:false`, а чат пока ответит `503`: это намеренно до подключения D1/KV/секретов.
+
+1. В Cloudflare Dashboard открыть **Workers & Pages → Create application → GitHub** (вариант **Import existing Git repository**).
+2. Выбрать GitHub-аккаунт `socman2023`, репозиторий **`sanko-chat`**, ветку **`main`**.
+3. Имя Worker: **`sanko-chat-api`** (должно точно совпадать с `name` в `worker/wrangler.toml`).
+4. **Root directory: `worker`**. Это принципиально: GitHub Pages остаётся из корня репозитория и не превращается в Worker.
+5. **Build command: оставить пустым**; **Deploy command: `npx wrangler deploy`**; выбрать **Save and Deploy**.
+6. Открыть URL нового Worker и убедиться в JSON с `character: "sanko"`, `version: "sanko-worker-0.1.0"`, `configured: false`.
+7. После первого deploy можно подключать bindings и секреты, не меняя Worker Олешки.
+
+Этот bootstrap не готов обслуживать реальные сообщения, пока не закончена настройка Cloudflare.
+
+## Подготовка к этапу 4.3 / 4.4 (после создания Worker)
 
 1. Создать новую Cloudflare D1 **`heroes-chat-sanko`**; не касаться `heroes-chat-guard`.
-2. В `worker/wrangler.toml` подставить ID **существующего** KV `heroes-chat-current` и ID **новой** D1 Санко. Vectorize уже указан по имени `heroes-knowledge`; `AI` — Workers AI.
+2. После создания ресурсов дополнить `worker/wrangler.toml` блоками Workers AI (`AI`), Vectorize (`KNOWLEDGE` → `heroes-knowledge`), KV (`CURRENT_CONTEXT` → `heroes-chat-current`) и D1 (`GUARD_DB` → **только новую** `heroes-chat-sanko`), с подлинными ID. Пока эти блоки намеренно отсутствуют, чтобы первый deploy прошёл без ложных значений.
 3. Применить схему **только к новой D1**, командой из каталога `worker`:
    `npx wrangler d1 migrations apply heroes-chat-sanko --remote`.
 4. Создать отдельный Google AI API key в собственном проекте Санко и положить его в Cloudflare Secret `GEMINI_API_KEY`; `IP_HASH_SECRET` — второй секрет, новый случайный длинный ключ. Не передавать их в чат и не класть в GitHub.
