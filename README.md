@@ -20,7 +20,7 @@
 - `tests/static-check.mjs` — базовые проверки клиента.
 - `worker/src/` — независимый Cloudflare Worker Санко.
 - `worker/migrations/0001_init.sql` — схема отдельной D1 Санко.
-- `worker/wrangler.toml` — отдельные bindings с placeholders для ID.
+- `wrangler.toml` — корневая конфигурация нового Worker `sanko-chat-api`, готовая для импорта из текущего Cloudflare без поля Root directory.
 - `worker/tests/` — модульные тесты дат, изоляции и API.
 - `worker/README.md` — подробный план дальнейшего развёртывания.
 
