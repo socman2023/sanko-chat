@@ -29,7 +29,8 @@ export function nextDay(iso) {
 }
 export function isRealDay(value) {
   if (typeof value !== "string" || !/^20\d{2}-\d{2}-\d{2}$/.test(value)) return false;
-  return new Date(value + "T00:00:00Z").toISOString().slice(0, 10) === value;
+  const d=new Date(value + "T00:00:00Z");
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
 export function dateIntent(question, today = dayInMoscow()) {
   if (typeof question !== "string") return null;
