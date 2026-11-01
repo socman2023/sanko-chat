@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1200" viewBox="0 0 720 1200">
+<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#385a49"/><stop offset=".6" stop-color="#69806a"/><stop offset="1" stop-color="#243f33"/></linearGradient><radialGradient id="glow"><stop stop-color="#e8dca7" stop-opacity=".55"/><stop offset="1" stop-color="#e8dca7" stop-opacity="0"/></radialGradient></defs>
+<rect width="720" height="1200" fill="url(#sky)"/><ellipse cx="360" cy="580" rx="310" ry="385" fill="url(#glow)"/>
+<g fill="#2c4d3d" opacity=".5"><path d="M-20 1200V430l35-30 24 30v770zM115 1200V330l20-25 17 25v870zM300 1200V510l23-24 16 24v690zM505 1200V240l28-30 20 30v960zM648 1200V410l27-35 22 35v790z"/></g>
+<g fill="#162d26" opacity=".67"><path d="M12 1200V0h43v1200zM196 1200V0h33v1200zM611 1200V0h46v1200z"/></g>
+<g fill="#244637" opacity=".75"><path d="M0 240 110 60l-76 280zM40 320 160 88 100 430zM168 270 310 30 245 390zM395 286 540 22 470 430zM560 355 714 130 650 470z"/></g>
+<g fill="#102b22" opacity=".62"><path d="M0 875 120 690 60 1020zM115 850 230 640 205 1070zM455 865 570 645 535 1030zM610 870 735 650 704 1070z"/></g>
+<path d="M0 1030c90-43 154-40 235-8s171 41 260 0 161-17 225 8v170H0z" fill="#163628"/>
+</svg>
