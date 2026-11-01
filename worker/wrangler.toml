@@ -1,34 +1,14 @@
-# Separate Worker for Sanko. Never deploy over oleshka-chat-api.
+# Dedicated Sanko Worker. Bootstrap deployment ONLY.
+# Do not deploy onto oleshka-chat-api.
+# Shared KV/Vectorize and Sanko-only D1 will be configured in stage 4.3.
+# No placeholder database IDs: this file can be deployed immediately.
 name = "sanko-chat-api"
 main = "src/index.js"
 compatibility_date = "2026-10-31"
 workers_dev = true
 
-[ai]
-binding = "AI"
-
-[[vectorize]]
-binding = "KNOWLEDGE"
-index_name = "heroes-knowledge"
-
-# Replace ONLY IDs during stage 4.3 / deployment.
-# This binding must point to the EXISTING heroes-chat-current namespace.
-[[kv_namespaces]]
-binding = "CURRENT_CONTEXT"
-id = "REPLACE_WITH_EXISTING_HEROES_CHAT_CURRENT_KV_ID"
-
-# This must point to a NEW, separate Sanko D1. NEVER use heroes-chat-guard's ID.
-[[d1_databases]]
-binding = "GUARD_DB"
-database_name = "heroes-chat-sanko"
-database_id = "REPLACE_WITH_NEW_SANKO_D1_ID"
-migrations_dir = "migrations"
-
 [vars]
 ALLOWED_ORIGIN = "https://socman2023.github.io"
-# Optional: GEMINI_MODEL_ORDER = "model1,model2,model3,model4"
-# All API tokens, including GEMINI_API_KEY and IP_HASH_SECRET, go in
-# Cloudflare Secrets, NOT here or in GitHub.
 
-[triggers]
-crons = ["0 4 * * *"]
+# Do not commit GEMINI_API_KEY, IP_HASH_SECRET or VK secrets.
+# Do not enable runtime chat until separate resources and a canon profile are provisioned.
