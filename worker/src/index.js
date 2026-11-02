@@ -5,7 +5,7 @@ import {
  limitRetryAt, cleanConversationId, isAllowedOrigin
 } from "./lib.js";
 
-const VERSION="sanko-worker-0.2.2";
+const VERSION="sanko-worker-0.2.3";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
