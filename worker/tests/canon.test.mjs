@@ -9,7 +9,7 @@ function fake(){
  const db={prepare(sql){
   const stmt={sql,params:[],bind(...args){this.params=args;return this;},
    async run(){calls.sql.push({sql:this.sql,args:this.params});return {success:true};},
-   async first(){calls.sql.push({sql:this.sql,args:this.params});return {n:1,indexed:1};},
+   async first(){calls.sql.push({sql:this.sql,args:this.params});return {n:1,indexedCount:1};},
    async all(){calls.sql.push({sql:this.sql,args:this.params});
     if(sql.includes("GROUP BY source"))return {results:[{source:"heroes.docx",n:1}]};
     return {results:[]};}
