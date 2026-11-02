@@ -5,7 +5,7 @@ import {
  limitRetryAt, cleanConversationId, isAllowedOrigin
 } from "./lib.js";
 
-const VERSION="sanko-worker-0.1.0";
+const VERSION="sanko-worker-0.2.0";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -299,7 +299,7 @@ async function chat(req,env,origin,ctx) {
  return respond({
   conversationId:id,reply:generated.reply,model:generated.model,
   fallbackUsed:generated.fallbackUsed,
-  knowledge:{focusDate:scope?.day||"",matches:hits.length,mode:scope?"date-scoped":"general"}
+  knowledge:{focusDate:scope?.day||"",matches:hits.length,diaryPosts:diary.posts.length,mode:scope?"date-scoped":"general"}
  },200,origin,env);
 }
 export default {
@@ -309,7 +309,8 @@ export default {
   const path=new URL(req.url).pathname;
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:headers(origin,env)});
   if(req.method==="GET"&&(path==="/"||path==="/health"))
-   return respond({status:"ok",character:CHARACTER,version:VERSION,configured:ready(env)},200,origin,env);
+   return respond({status:"ok",character:CHARACTER,version:VERSION,configured:ready(env),
+    diaryConnected:!!env.DIARY_DB?.prepare},200,origin,env);
   try {
    if(req.method==="POST"&&path==="/api/session")return await session(req,env,origin);
    if(req.method==="POST"&&path==="/api/chat")return await chat(req,env,origin,ctx);
