@@ -5,7 +5,7 @@ import {
  limitRetryAt, cleanConversationId, isAllowedOrigin
 } from "./lib.js";
 
-const VERSION="sanko-worker-0.2.0";
+const VERSION="sanko-worker-0.2.1";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -123,55 +123,109 @@ async function retrieve(env,question,scope) {
 // All queries here are SELECT ONLY. Never write to the Oleshka D1 or its KV keys.
 // Bounded on-demand lookup supports older journal episodes without a copy of
 // the journal or weakening the character partition in Vectorize.
+// Read the SAME journal imported by Oleshka's three-hour updater.
+// It is important to retrieve full daily entries: their afternoon events
+// are often far beyond the first 1,900 characters.
 function diaryTerms(question) {
  const stop=new Set(["когда","почему","какой","какая","какие","который",
  "расскажи","помнишь","сегодня","вчера","позавчера","дневнике","дневник",
  "случилось","произошло","пожалуйста","тогда","после","этого",
  "вместе","олешка","олешке","олешкой","санко","самого","вашего"]);
  return [...new Set((String(question||"").toLowerCase().match(/[\p{L}]{5,}/gu)||[])
-  .filter(w=>!stop.has(w)))].slice(0,2);
+   .filter(w=>!stop.has(w)))].slice(0,2);
+}
+function diaryBody(value) {
+ const text=typeof value==="string"?value.trim():"";
+ // Only extremely long posts need reduction; retain both beginning and end.
+ if(text.length<=16000)return text;
+ return text.slice(0,7800)+"\n[Средняя часть длинной публикации пропущена]\n"+
+   text.slice(-7800);
 }
 async function loadPublishedDiary(env,scope,question="") {
  if(!env.DIARY_DB?.prepare)return {available:false,posts:[]};
  const day=scope?.day||"";
- const base="SELECT post_id,published_day_msk,source_url,source_text FROM oleshka_vk_diary "+
-  "WHERE owner_id=? AND category NOT IN ('excluded','rejected') ";
+ const base="SELECT post_id,published_day_msk,source_url,source_text "+
+  "FROM oleshka_vk_diary WHERE owner_id=? "+
+  "AND category NOT IN ('excluded','rejected') ";
  const read=async(sql,values)=>(await env.DIARY_DB.prepare(sql).bind(...values).all())?.results||[];
  try{
-  let rows=[];
+  const rows=[];
   if(day){
-   rows=await read(base+"AND published_day_msk=? ORDER BY published_at DESC LIMIT 16",
-     [850667816,day]);
-  }else{
+   // An explicit date: all relevant posts from that publication day first.
+   rows.push(...await read(base+"AND published_day_msk=? "+
+     "ORDER BY published_at DESC,post_id DESC LIMIT 20",[850667816,day]));
+  } else {
+   // Current and previous day take PRIORITY over topic matches.
+   // Follow-ups like "А потом?" now still see the whole recent day.
+   const today=dayInMoscow(),yesterday=previousDiaryDay(today);
+   rows.push(...await read(base+"AND published_day_msk=? "+
+     "ORDER BY published_at DESC,post_id DESC LIMIT 20",[850667816,today]));
+   rows.push(...await read(base+"AND published_day_msk=? "+
+     "ORDER BY published_at DESC,post_id DESC LIMIT 12",[850667816,yesterday]));
    const words=diaryTerms(question);
    if(words.length){
     const where=words.map(()=>"source_text LIKE ?").join(" OR ");
-    const topic=await read(base+"AND ("+where+") ORDER BY published_at DESC LIMIT 10",
-      [850667816,...words.map(w=>"%"+w+"%")]);
-    rows.push(...topic);
+    rows.push(...await read(base+"AND ("+where+") "+
+      "ORDER BY published_at DESC,post_id DESC LIMIT 10",
+      [850667816,...words.map(w=>"%"+w+"%")]));
    }
-   const latest=await read(base+"ORDER BY published_at DESC LIMIT 10",[850667816]);
-   rows.push(...latest);
+   rows.push(...await read(base+"ORDER BY published_at DESC,post_id DESC LIMIT 12",[850667816]));
   }
   const posts=[],seen=new Set();let total=0;
+  const maxChars=30000,maxPosts=16;
   for(const row of rows){
    const id=Number(row?.post_id);
    if(!Number.isSafeInteger(id)||id<=0||seen.has(id))continue;
    seen.add(id);
-   const body=shorten(row.source_text,1900);
+   const text=diaryBody(row.source_text);
    const stamp=String(row.published_day_msk||"");
-   if(!isRealDay(stamp)||!body)continue;
-   if(total+body.length>13500)continue;
+   if(!isRealDay(stamp)||!text)continue;
+   if(total+text.length>maxChars) {
+    // Leave the remaining space for at least a meaningful excerpt.
+    if(posts.length===0)continue;
+    continue;
+   }
    const source=String(row.source_url||"");
    const url=/^https:\/\/vk\.(?:com|ru)\/wall850667816_\d+$/.test(source)?source:"";
-   posts.push({day:stamp,text:body,source:url});
-   total+=body.length;
-   if(posts.length>=16)break;
+   posts.push({day:stamp,text,source:url,postId:id});
+   total+=text.length;
+   if(posts.length>=maxPosts)break;
   }
   return {available:true,posts};
  }catch(err){
   console.warn("Sanko diary read failed",err?.name);
   return {available:false,posts:[]};
+ }
+}
+function previousDiaryDay(day) {
+ const epoch=Date.parse(day+"T00:00:00Z");
+ return new Date(epoch-86400000).toISOString().slice(0,10);
+}
+// Expose PUBLIC post timestamps only, not private messages or D1 table rows.
+async function diarySyncStatus(env) {
+ if(!env.DIARY_DB?.prepare)return {status:"binding_missing"};
+ const base="FROM oleshka_vk_diary WHERE owner_id=? "+
+  "AND category NOT IN ('excluded','rejected') ";
+ try{
+  const [latest,dayResult]=await Promise.all([
+   env.DIARY_DB.prepare("SELECT post_id,published_day_msk,published_at,ingested_at,source_url "+
+    base+"ORDER BY published_at DESC,post_id DESC LIMIT 1").bind(850667816).first(),
+   env.DIARY_DB.prepare("SELECT COUNT(*) AS total "+base+
+    "AND published_day_msk=?").bind(850667816,dayInMoscow()).first()
+  ]);
+  const lastPublished=Number(latest?.published_at||0);
+  const lastIngest=Number(latest?.ingested_at||0);
+  return {
+   status:"ok",
+   latestPostDay:String(latest?.published_day_msk||""),
+   latestPostId:latest?.post_id==null?null:Number(latest.post_id),
+   latestPublishedAt:lastPublished?new Date(lastPublished*1000).toISOString():null,
+   latestIngestedAt:lastIngest?new Date(lastIngest*1000).toISOString():null,
+   postsToday:Number(dayResult?.total||0)
+  };
+ }catch(err){
+  console.warn("Sanko diary diagnostics unavailable",err?.name);
+  return {status:"read_error"};
  }
 }
 function systemText(runtime,scope,hits,today,diary) {
@@ -336,7 +390,8 @@ export default {
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:headers(origin,env)});
   if(req.method==="GET"&&(path==="/"||path==="/health"))
    return respond({status:"ok",character:CHARACTER,version:VERSION,configured:ready(env),
-    diaryConnected:!!env.DIARY_DB?.prepare},200,origin,env);
+    diaryConnected:!!env.DIARY_DB?.prepare,
+    diarySync:await diarySyncStatus(env)},200,origin,env);
   try {
    if(req.method==="POST"&&path==="/api/session")return await session(req,env,origin);
    if(req.method==="POST"&&path==="/api/chat")return await chat(req,env,origin,ctx);
