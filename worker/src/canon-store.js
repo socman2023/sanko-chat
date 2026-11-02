@@ -65,3 +65,23 @@ export async function canonImport(env,body) {
   return json({error:"status_write_failed",stored:records.length,indexed:records.length},503);}
  return json({ok:true,stored:records.length,indexed:records.length});
 }
+
+export async function canonLexical(env,question,max=6) {
+ if(!env.GUARD_DB?.prepare)return [];
+ const stop=new Set(["когда","почему","какая","какие","такое","вообще",
+ "расскажи","какой","который","помнишь","знаешь","дневнике",
+ "сегодня","вчера","потом","тогда","олешка","санко","поднебесье"]);
+ const terms=[...new Set((String(question||"").toLowerCase().match(/[\p{L}]{4,}/gu)||[])
+  .filter(x=>!stop.has(x)))].slice(0,3);
+ if(!terms.length)return [];
+ try{
+  const sql="SELECT id,source,scope,priority,published_day,content FROM sanko_canon_chunks "+
+   "WHERE "+terms.map(()=>"content LIKE ? ESCAPE '\\'").join(" OR ")+
+   " ORDER BY priority ASC,published_day DESC LIMIT ?";
+  const args=terms.map(w=>"%"+w.replace(/[%_\\]/g,"\\$&")+"%");
+  const r=await env.GUARD_DB.prepare(sql).bind(...args,max).all();
+  return (r?.results||[]).map(x=>({id:x.id,text:String(x.content),
+   source:String(x.source),layer:String(x.scope),date:String(x.published_day||""),
+   priority:Number(x.priority||9),score:1}));
+ }catch{return [];}
+}
