@@ -26,6 +26,10 @@ binding = "AI"
 binding = "KNOWLEDGE"
 index_name = "heroes-knowledge"
 
-# KV CURRENT_CONTEXT will be added when the existing heroes-chat-current
-# namespace ID is supplied. Do NOT invent an ID or create a duplicate.
-# No API secrets belong in this public repository.
+# Existing shared KV namespace, with strict Sanko-only key prefix "sanko:".
+# This is NOT a new namespace; do not write to Oleshka's "oleshka:" keys.
+[[kv_namespaces]]
+binding = "CURRENT_CONTEXT"
+id = "64705cefb4f54ff7bed3da7c5f0cb472"
+
+# Secrets stay in Cloudflare, never in this repository.
