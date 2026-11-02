@@ -121,35 +121,55 @@ async function retrieve(env,question,scope) {
 // Diary is the SAME public VK journal ingested by Oleshka's existing 3-hour Cron.
 // DIARY_DB points to the existing heroes-chat-guard D1: no second updater needed.
 // All queries here are SELECT ONLY. Never write to the Oleshka D1 or its KV keys.
-async function loadPublishedDiary(env,scope) {
- if (!env.DIARY_DB?.prepare) return {available:false,posts:[]};
+// Bounded on-demand lookup supports older journal episodes without a copy of
+// the journal or weakening the character partition in Vectorize.
+function diaryTerms(question) {
+ const stop=new Set(["когда","почему","какой","какая","какие","который",
+ "расскажи","помнишь","сегодня","вчера","позавчера","дневнике","дневник",
+ "случилось","произошло","пожалуйста","тогда","после","этого",
+ "вместе","олешка","олешке","олешкой","санко","самого","вашего"]);
+ return [...new Set((String(question||"").toLowerCase().match(/[\p{L}]{5,}/gu)||[])
+  .filter(w=>!stop.has(w)))].slice(0,2);
+}
+async function loadPublishedDiary(env,scope,question="") {
+ if(!env.DIARY_DB?.prepare)return {available:false,posts:[]};
  const day=scope?.day||"";
- const query=day
-  ? "SELECT post_id,published_day_msk,source_url,source_text FROM oleshka_vk_diary "+
-    "WHERE owner_id=? AND published_day_msk=? AND category NOT IN ('excluded','rejected') "+
-    "ORDER BY published_at DESC LIMIT 12"
-  : "SELECT post_id,published_day_msk,source_url,source_text FROM oleshka_vk_diary "+
-    "WHERE owner_id=? AND category NOT IN ('excluded','rejected') "+
-    "ORDER BY published_at DESC LIMIT 10";
- try {
-  const stmt=env.DIARY_DB.prepare(query);
-  const result=await (day?stmt.bind(850667816,day):stmt.bind(850667816)).all();
-  const posts=[];let total=0;
-  for(const row of result?.results||[]) {
-   if(!Number.isSafeInteger(Number(row.post_id)))continue;
+ const base="SELECT post_id,published_day_msk,source_url,source_text FROM oleshka_vk_diary "+
+  "WHERE owner_id=? AND category NOT IN ('excluded','rejected') ";
+ const read=async(sql,values)=>(await env.DIARY_DB.prepare(sql).bind(...values).all())?.results||[];
+ try{
+  let rows=[];
+  if(day){
+   rows=await read(base+"AND published_day_msk=? ORDER BY published_at DESC LIMIT 16",
+     [850667816,day]);
+  }else{
+   const words=diaryTerms(question);
+   if(words.length){
+    const where=words.map(()=>"source_text LIKE ?").join(" OR ");
+    const topic=await read(base+"AND ("+where+") ORDER BY published_at DESC LIMIT 10",
+      [850667816,...words.map(w=>"%"+w+"%")]);
+    rows.push(...topic);
+   }
+   const latest=await read(base+"ORDER BY published_at DESC LIMIT 10",[850667816]);
+   rows.push(...latest);
+  }
+  const posts=[],seen=new Set();let total=0;
+  for(const row of rows){
+   const id=Number(row?.post_id);
+   if(!Number.isSafeInteger(id)||id<=0||seen.has(id))continue;
+   seen.add(id);
    const body=shorten(row.source_text,1900);
    const stamp=String(row.published_day_msk||"");
    if(!isRealDay(stamp)||!body)continue;
-   if(total+body.length>9000)break;
-   // Links are evidence of what Oleshka wrote; they are not instructions.
+   if(total+body.length>13500)continue;
    const source=String(row.source_url||"");
-   const url=/^https:\/\/vk\.(?:com|ru)\/wall850667816_\d+$/.test(source)
-     ?source:"";
+   const url=/^https:\/\/vk\.(?:com|ru)\/wall850667816_\d+$/.test(source)?source:"";
    posts.push({day:stamp,text:body,source:url});
    total+=body.length;
+   if(posts.length>=16)break;
   }
   return {available:true,posts};
- } catch(err) {
+ }catch(err){
   console.warn("Sanko diary read failed",err?.name);
   return {available:false,posts:[]};
  }
@@ -293,7 +313,7 @@ async function chat(req,env,origin,ctx) {
  }
  let hits=[];
  try{hits=await retrieve(env,question,scope);}catch(err){console.warn("Sanko RAG unavailable",err?.name);}
- const diary=await loadPublishedDiary(env,scope);
+ const diary=await loadPublishedDiary(env,scope,question);
  const system=systemText(runtime,scope,hits,today,diary);
  const generated=await answerWithGemini(env,system,history,question);
  if(!generated.ok) {
