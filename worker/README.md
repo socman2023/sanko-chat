@@ -1,13 +1,13 @@
 # Cloudflare Worker Санко — шаги 4.2–4.3
 
-**Статус на 02.11.2026:** `sanko-chat-api` успешно развёрнут из GitHub на отдельном `workers.dev`. Владелец создал D1 `heroes-chat-sanko` (ID `d566ac31-19ce-463f-80e5-6ed1b0d56b16`). Binding `GUARD_DB` и путь `worker/migrations` внесены в корневой `wrangler.toml`. **Все три таблицы D1 созданы владельцем в Cloudflare Console, наличие подтверждено запросом SELECT.** В корневой `wrangler.toml` также добавлены bindings `AI` (Workers AI) и `KNOWLEDGE` (Vectorize `heroes-knowledge`); их live-деплой после коммита ещё не проверен. Для KV `CURRENT_CONTEXT` потребуется namespace ID существующего `heroes-chat-current`; секреты пока не настроены. Олешка 3.9.1 и его D1 не изменялись.
+**Статус на 02.11.2026:** `sanko-chat-api` успешно развёрнут из GitHub на отдельном `workers.dev`. Владелец создал D1 `heroes-chat-sanko` (ID `d566ac31-19ce-463f-80e5-6ed1b0d56b16`). Binding `GUARD_DB` и путь `worker/migrations` внесены в корневой `wrangler.toml`. **Все три таблицы D1 созданы владельцем в Cloudflare Console, наличие подтверждено запросом SELECT.** В корневой `wrangler.toml` также добавлены bindings `AI` (Workers AI) и `KNOWLEDGE` (Vectorize `heroes-knowledge`); их live-деплой после коммита ещё не проверен. KV `CURRENT_CONTEXT` теперь также указан в корневом `wrangler.toml` с Namespace ID `64705cefb4f54ff7bed3da7c5f0cb472` существующего `heroes-chat-current`. Секреты пока не настроены; новый деплой после изменения ещё не проверен. Олешка 3.9.1 и его D1 не изменялись.
 
 ## Архитектура
 
 - Новый Worker: **`sanko-chat-api`**.
 - Общий Workers AI binding: **`AI`** (будет подключён после первого bootstrap-деплоя).
 - Общий Vectorize: **`KNOWLEDGE` → `heroes-knowledge`** (будет подключён после первого bootstrap-деплоя).
-- Общий KV: **`CURRENT_CONTEXT` → `heroes-chat-current`**, только с ключами `sanko:*` (будет подключён позже).
+- Общий KV: **`CURRENT_CONTEXT` → `heroes-chat-current`**, настроен в корневом `wrangler.toml` с существующим Namespace ID. Worker будет читать/писать только ключи `sanko:*`.
 - **Отдельная D1**: `GUARD_DB` → **`heroes-chat-sanko`** (создана, ID зафиксирован; 3 таблицы и индексы выполнены в Console).
 - Свой Gemini API key / Google AI project и отдельная финансовая учётная запись модели, по ранее принятой схеме.
 - Лимиты Санко **500 запросов в день, 15 000 в месяц, 100 с IP за день**. Лимиты Олешки неизменны и никак не расходуются обращениями к Санко.
@@ -72,7 +72,7 @@ npm run check
 ## Подготовка к этапу 4.3 / 4.4 (после создания Worker)
 
 1. ✅ Создана отдельная D1 **`heroes-chat-sanko`** (база Олешки не затронута).
-2. ✅ В корневой `wrangler.toml` внесён D1 binding `GUARD_DB` и подлинный ID новой базы. AI, Vectorize и KV подключим позже.
+2. ✅ В корневой `wrangler.toml` внесены все четыре bindings: собственная D1 `GUARD_DB`, общие `AI`, `KNOWLEDGE` и `CURRENT_CONTEXT`. Реальное применение этой редакции конфигурации в Cloudflare ещё следует подтвердить.
 3. ✅ Схема применена вручную в Cloudflare D1 Console, три таблицы подтверждены SELECT. **Не запускать повторную миграцию 0001 через Wrangler без согласования**, поскольку консоль не помечает её выполненной в журнале Wrangler `d1_migrations`.
 4. Использовать уже созданный Google AI Studio проект `Sanko Chat` (Free Tier) и положить его API key в Cloudflare Secret `GEMINI_API_KEY`; `IP_HASH_SECRET` — второй секрет, новый случайный длинный ключ. Не передавать их в чат и не класть в GitHub.
 5. После авторского утверждения поместить персональный профиль в KV key `sanko:profile:v1` и датированный срез в `sanko:current:v1`; пример формы для последнего: `{"asOf":"2026-10-31","text":"..."}`.
