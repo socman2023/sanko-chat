@@ -39,6 +39,17 @@ function envStub(opts={}) {
     async run(){return {success:true};}
   })}
  };
+ if(opts.diary) {
+  env.DIARY_DB={prepare:(sql)=>{
+    observed.diarySql=sql;
+    return {bind(...params){observed.diaryParams=params;return this;},
+      async all(){return {results:[{
+        post_id:12345,owner_id:850667816,published_day_msk:"2026-10-31",
+        source_url:"https://vk.com/wall850667816_12345",
+        source_text:"Олешка написал в дневнике: перелетели Стену."
+      }]};}};
+  }};
+ }
  return {env,observed};
 }
 function req(message,extraHeaders={}) {
@@ -85,10 +96,11 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert(observed.kv.includes("sanko:profile:v1"));
   assert(!observed.kv.some(x=>x.startsWith("oleshka:")));
   const instructions=observed.gemini[0].system;
-  assert.match(instructions,/Строго запрещены буквы/);
-  assert.match(instructions,/понятным русским языком/);
-  assert.match(instructions,/Не объявляй, что сегодня кормишь коней/);
-  assert.match(instructions,/Отдельной дневной заметки нет/);
+  assert.match(instructions,/одна или две короткие фразы/);
+  assert.match(instructions,/примерно 8–30 слов/);
+  assert.match(instructions,/Дневник Олешки читаешь, но не всё в нём видел сам/);
+  assert.match(instructions,/Не сообщай выдуманные текущие события/);
+  assert(!instructions.includes("Олешка написал в дневнике: перелетели Стену."));
 
  }finally{globalThis.fetch=original;}
 });
@@ -99,4 +111,26 @@ test("monthly quota returns 429 without calling Gemini",async()=>{
  const data=await r.json();
  assert.equal(data.error,"quota_exhausted");
  assert(Number.isFinite(data.retryAt));
+});
+
+test("Sanko can read Oleshka's published diary read-only, without changing his D1",async()=>{
+ const {env,observed}=envStub({diary:true});
+ const nativeFetch=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+   observed.gemini.push({system:JSON.parse(init.body).systemInstruction.parts[0].text});
+   return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+     content:{parts:[{text:"Олешка написал, что Стену перелетели. Я тоже там был."}]}}]}),
+     {status:200,headers:{"Content-Type":"application/json"}});
+ };
+ try{
+   const r=await worker.fetch(req("А про 31 октября Олешка что написал?"),env,ctx);
+   assert.equal(r.status,200);
+   assert.match(observed.diarySql,/FROM oleshka_vk_diary/);
+   assert.match(observed.diarySql,/^SELECT/);
+   assert(!/\b(UPDATE|DELETE|INSERT)\b/i.test(observed.diarySql));
+   assert.deepEqual(observed.diaryParams,[850667816,"2026-10-31"]);
+   assert.match(observed.gemini[0].system,/Олешка написал в дневнике: перелетели Стену/);
+   assert.match(observed.gemini[0].system,/«Олешка писал»/);
+   assert.equal(observed.insertions.length,1);
+ }finally{globalThis.fetch=nativeFetch;}
 });
