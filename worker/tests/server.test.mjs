@@ -331,3 +331,23 @@ test("sanko personal relationships appear even without archive search",async()=>
   assert(prompt.includes("wall850667816_25792"));
  }finally{globalThis.fetch=original;}
 });
+
+test("late diary context preserves historical Sanko memory",async()=>{
+ const {env,observed}=envStub({diary:true,diaryPosts:[{
+  post_id:4001,published_day_msk:dayInMoscow(),
+  source_url:"https://vk.com/wall850667816_4001",
+  source_text:"Начало. "+"Большая запись. ".repeat(4500)+"КОНЕЦ ЗАПИСИ."
+ }]});
+ const original=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  observed.gemini.push(JSON.parse(init.body).systemInstruction.parts[0].text);
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Помню."}]}}]}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(req("Кто такая Луна?"),env,ctx);
+  assert.equal(response.status,200);
+  assert(observed.gemini[0].includes("КОНЕЦ ЗАПИСИ."));
+  assert(observed.gemini[0].includes("ЯСМИН = ЛУНА"));
+ }finally{globalThis.fetch=original;}
+});
