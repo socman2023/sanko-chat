@@ -74,16 +74,25 @@ export async function canonLexical(env,question,max=6) {
  if(!env.GUARD_DB?.prepare)return [];
  const stop=new Set(["когда","почему","какая","какие","такое","вообще",
  "расскажи","какой","который","помнишь","знаешь","дневнике",
- "сегодня","вчера","потом","тогда","олешка","санко","поднебесье"]);
- const terms=[...new Set((String(question||"").toLowerCase().match(/[\p{L}]{4,}/gu)||[])
-  .filter(x=>!stop.has(x)))].slice(0,3);
+ "сегодня","вчера","потом","тогда","олешка","санко",
+ "поднебесье","поднебесья","поднебесье","скажешь","скажешь"]);
+ const tokens=(String(question||"").toLocaleLowerCase("ru-RU").match(/[\p{L}]{4,}/gu)||[])
+  .filter(x=>!stop.has(x));
+ const terms=[...new Set(tokens.map(w=>{
+  const stem=w.length>=6?w.replace(/(иями|ями|ами|ого|его|ому|ему|ыми|ими|остью|остью|ами|ями|ьям|ьей|иях|иях|ией|ого|ого|ов|ев|ой|ий|ые|ия|ью|ом|ем|а|я|ы|и|у|е)$/u,""):w;
+  return stem.length>=4?stem:w;
+ }))].slice(0,3);
  if(!terms.length)return [];
+ const query=String(question||"").toLocaleLowerCase("ru-RU");
+ const target=/бог|бож|пантеон|народ|стран|календар|празд|географ|карту|города|местност|царств/u.test(query)?"world":
+  /академ|урок|предмет|учител|курс|школ|экзамен/u.test(query)?"academy":
+  /кто|кому|чей|знаком|люб|родствен|семь|друг/u.test(query)?"characters":"diary";
  try{
   const sql="SELECT id,source,scope,priority,published_day,content FROM sanko_canon_chunks "+
    "WHERE "+terms.map(()=>"search_text LIKE ? ESCAPE '\\'").join(" OR ")+
-   " ORDER BY priority ASC,published_day DESC LIMIT ?";
+   " ORDER BY CASE WHEN scope=? THEN 0 ELSE 1 END, priority ASC,published_day DESC LIMIT ?";
   const args=terms.map(w=>"%"+w.replace(/[%_\\]/g,"\\$&")+"%");
-  const r=await env.GUARD_DB.prepare(sql).bind(...args,max).all();
+  const r=await env.GUARD_DB.prepare(sql).bind(...args,target,max).all();
   return (r?.results||[]).map(x=>({id:x.id,text:String(x.content),
    source:String(x.source),layer:String(x.scope),date:String(x.published_day||""),
    priority:Number(x.priority||9),score:1}));
