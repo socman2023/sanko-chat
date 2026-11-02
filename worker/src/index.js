@@ -8,7 +8,7 @@ import { SANKO_CORE_RELATIONSHIPS } from "./sanko-core-relationships.js";
 import { canonLexical } from "./canon-store.js";
 import { adminFetch } from "./admin.js";
 
-const VERSION="sanko-worker-0.4.0";
+const VERSION="sanko-worker-0.4.1";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
