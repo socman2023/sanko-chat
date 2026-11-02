@@ -25,6 +25,7 @@ export const ADMIN_HTML = String.raw`<!doctype html>
       <input id="token" type="password" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ADMIN_UPDATE_TOKEN">
     </label>
     <button type="submit" id="load">Открыть данные</button>
+    <button type="button" class="secondary" id="refresh" disabled>Обновить</button>
   </form>
   <p class="hint">Доступ к статистике и текстам разговоров защищён токеном. Пароль не сохраняется в браузере. История разговоров хранится до 30 дней.</p>
   <p id="status" role="status" aria-live="polite"></p>
@@ -185,14 +186,15 @@ export const ADMIN_SCRIPT = String.raw`
   try {
    if(area==="stats")showStatus(await api("/admin/stats/data"));
    else await loadThreads();
-   unlocked=true;message("");
+   unlocked=true;$("refresh").disabled=false;message("");
   }catch(err){
    message(err.message);if(area==="stats")$("stats").hidden=true;
    if(area==="chats")$("chats").hidden=true;
-   unlocked=false;
+   unlocked=false;$("refresh").disabled=true;
   }finally{loading=false;$("load").disabled=false;}
  }
  login.addEventListener("submit",e=>{e.preventDefault();offset=0;load();});
+ $("refresh").addEventListener("click",()=>{if(unlocked)load();});
  if(area==="chats"){
   $("searchForm").addEventListener("submit",e=>{
    e.preventDefault();if(!unlocked)return;search=$("search").value.trim();offset=0;selected="";load();
