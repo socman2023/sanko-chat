@@ -74,10 +74,10 @@ npm run check
 1. ✅ Создана отдельная D1 **`heroes-chat-sanko`** (база Олешки не затронута).
 2. ✅ В корневой `wrangler.toml` внесены все четыре bindings: собственная D1 `GUARD_DB`, общие `AI`, `KNOWLEDGE` и `CURRENT_CONTEXT`. Реальное применение этой редакции конфигурации в Cloudflare ещё следует подтвердить.
 3. ✅ Схема применена вручную в Cloudflare D1 Console, три таблицы подтверждены SELECT. **Не запускать повторную миграцию 0001 через Wrangler без согласования**, поскольку консоль не помечает её выполненной в журнале Wrangler `d1_migrations`.
-4. Использовать уже созданный Google AI Studio проект `Sanko Chat` (Free Tier) и положить его API key в Cloudflare Secret `GEMINI_API_KEY`; `IP_HASH_SECRET` — второй секрет, новый случайный длинный ключ. Не передавать их в чат и не класть в GitHub.
-5. После авторского утверждения поместить персональный профиль в KV key `sanko:profile:v1` и датированный срез в `sanko:current:v1`; пример формы для последнего: `{"asOf":"2026-10-31","text":"..."}`.
+4. ✅ Владелец подтвердил добавление двух Secrets в Worker Санко: `GEMINI_API_KEY` и `IP_HASH_SECRET`. Значения неизвестны приложению GitHub и не публикуются. Реальный запрос Gemini ещё не проверен.
+5. **Текущий шаг:** в существующем KV `heroes-chat-current` создать **только** два ключа `sanko:profile:v1` и `sanko:current:v1`. Содержимое подготовлено вне публичного GitHub из литературного пакета v0.2 REVIEW; это **рабочая версия для тестирования**, не утверждённый новый канон. Текущий срез: `{"asOf":"2026-10-31","text":"..."}`.
 6. Развернуть только `sanko-chat-api`, проверить `GET /`, `POST /api/chat` и фильтры. После этого обновить `assets/config.js` новым URL. До этой операции сайт остаётся честным макетом.
 
-**Ничего в Cloudflare на шаге 4.2 не создавалось, не редактировалось и не развёртывалось.**
+**Текущий статус:** Worker `sanko-chat-api`, D1 и bindings созданы. Секреты добавлены владельцем. Персональные KV-записи и реальные API-тесты ещё не выполнены. Действующий Worker Олешки не менялся.
 
 Справка: [Wrangler bindings](https://developers.cloudflare.com/workers/wrangler/configuration/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/), [Vectorize metadata filtering](https://developers.cloudflare.com/vectorize/reference/metadata-filtering/).
