@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.js";
+import { dayInMoscow } from "../src/lib.js";
 
 const URL="https://sanko-chat-api.example/api/chat";
 function envStub(opts={}) {
@@ -43,7 +44,7 @@ function envStub(opts={}) {
   env.DIARY_DB={prepare:(sql)=>{
     observed.diarySql=sql;
     return {bind(...params){observed.diaryParams=params;return this;},
-      async all(){return {results:[{
+      async all(){return {results:opts.diaryPosts||[{
         post_id:12345,owner_id:850667816,published_day_msk:"2026-10-31",
         source_url:"https://vk.com/wall850667816_12345",
         source_text:"Олешка написал в дневнике: перелетели Стену."
@@ -159,12 +160,44 @@ test("Undated query consults older published diary entries by topic and latest p
  try{
   const r=await worker.fetch(req("А что там было с Мстиславом?"),env,ctx);
   assert.equal(r.status,200);
-  assert.equal(requests.length,2);
+  assert.equal(requests.length,4);
   assert(requests.every(x=>x.sql.startsWith("SELECT ")));
   assert(requests.every(x=>!/\b(?:UPDATE|DELETE|INSERT)\b/i.test(x.sql)));
-  assert.match(requests[0].sql,/source_text LIKE/);
-  assert.deepEqual(requests[0].values,[850667816,"%мстиславом%"]);
-  assert.deepEqual(requests[1].values,[850667816]);
+  assert.match(requests[0].sql,/published_day_msk/);
+  assert.deepEqual(requests[0].values,[850667816,dayInMoscow()]);
+  assert.match(requests[1].sql,/published_day_msk/);
+  assert.match(requests[2].sql,/source_text LIKE/);
+  assert.deepEqual(requests[2].values,[850667816,"%мстиславом%"]);
+  assert.deepEqual(requests[3].values,[850667816]);
   assert.equal((await r.json()).knowledge.diaryPosts,1);
  }finally{globalThis.fetch=oldFetch;}
+});
+
+test("Today diary includes morning plus afternoon, including text beyond 1900 chars",async()=>{
+ const today=dayInMoscow();
+ const afternoon="ПОСЛЕ ОБЕДА КНЯЖИЧ ВЕРНУЛСЯ ОТ КУПЦА, И ВЫЯСНИЛОСЬ НОВОЕ.";
+ const {env,observed}=envStub({diary:true,diaryPosts:[
+  {post_id:2002,owner_id:850667816,published_day_msk:today,
+   source_url:"https://vk.com/wall850667816_2002",source_text:"А после обеда: "+afternoon},
+  {post_id:2001,owner_id:850667816,published_day_msk:today,
+   source_url:"https://vk.com/wall850667816_2001",source_text:"Утро. "+"Переговоры длились. ".repeat(130)+afternoon}
+ ]});
+ const original=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  observed.gemini.push({system:JSON.parse(init.body).systemInstruction.parts[0].text});
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+    content:{parts:[{text:"Вернулся княжич от купца. Теперь решаем, что дальше."}]}}]}),
+    {status:200,headers:{"Content-Type":"application/json"}});
+ };
+ try{
+  const r=await worker.fetch(req("А потом?"),env,ctx);
+  assert.equal(r.status,200);
+  const data=await r.json();
+  assert.equal(data.knowledge.diaryPosts,2);
+  const prompt=observed.gemini[0].system;
+  assert(prompt.includes(afternoon));
+  assert(prompt.includes("Переговоры длились."));
+  assert(prompt.includes("wall850667816_2002"));
+  assert(prompt.includes("wall850667816_2001"));
+ }finally{globalThis.fetch=original;}
 });
