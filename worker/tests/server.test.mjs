@@ -66,7 +66,10 @@ test("missing approved profile returns 503 without charging quota",async()=>{
 test("successful reply isolates profile, Vectorize and date",async()=>{
  const {env,observed}=envStub();
  const original=globalThis.fetch;
- globalThis.fetch=async(url)=>{observed.gemini.push(url);return new Response(JSON.stringify({
+ globalThis.fetch=async(url,init)=>{observed.gemini.push({
+   url,
+   system:JSON.parse(init.body).systemInstruction.parts[0].text
+  });return new Response(JSON.stringify({
   candidates:[{finishReason:"STOP",content:{parts:[{text:"Про то я тебе и расскажу."}]}}]
  }),{status:200,headers:{"Content-Type":"application/json"}});};
  try{
@@ -81,6 +84,12 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert.equal(observed.insertions.length,1);
   assert(observed.kv.includes("sanko:profile:v1"));
   assert(!observed.kv.some(x=>x.startsWith("oleshka:")));
+  const instructions=observed.gemini[0].system;
+  assert.match(instructions,/Строго запрещены буквы/);
+  assert.match(instructions,/понятным русским языком/);
+  assert.match(instructions,/Не объявляй, что сегодня кормишь коней/);
+  assert.match(instructions,/Отдельной дневной заметки нет/);
+
  }finally{globalThis.fetch=original;}
 });
 test("monthly quota returns 429 without calling Gemini",async()=>{
