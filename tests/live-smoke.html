@@ -68,6 +68,7 @@ button:focus-visible,textarea:focus-visible{outline:3px solid #a6793a;outline-of
        "Персонаж: "+(d.character||"не указан")+"\n"+
        "Версия: "+(d.version||"не указана")+"\n"+
        "Готовность конфигурации: "+String(d.configured)+"\n"+
+       "Дневник (binding): "+String(d.diaryConnected)+"\n"+
        (d.configured===false?"Профиль и/или bindings/secrets ещё нужно проверить.":"");
       configured=result.status===200 && d.character==="sanko" && d.configured===true;
       answer.textContent=configured?"Можно отправить один тестовый вопрос.":"Отправка сообщений заблокирована до успешной проверки.";
@@ -87,7 +88,8 @@ button:focus-visible,textarea:focus-visible{outline:3px solid #a6793a;outline-of
        (typeof d.reply==="string"?"Ответ Санко:\n"+d.reply+"\n\n":"")+
        (typeof d.error==="string"?"Ошибка: "+d.error+"\n":"")+
        (typeof d.model==="string"?"Модель: "+d.model+"\n":"")+
-       (d.knowledge?"Поиск: "+JSON.stringify(d.knowledge):"");
+       (d.knowledge?"Поиск: "+JSON.stringify(d.knowledge)+"\n"+
+        "Публикации дневника в ответе: "+String(d.knowledge.diaryPosts??"нет поля"):"");
     }catch(err){answer.textContent="Ошибка связи: "+(err?.message||String(err));}
     finally{busy=false;setButtons();}
   });
