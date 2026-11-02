@@ -1,6 +1,3 @@
--- Run ONLY in Sanko's new D1 database (never heroes-chat-guard).
--- Migration 0001: independent admissions, chat history and approved day notes.
-
 CREATE TABLE IF NOT EXISTS chat_admissions (
   request_id TEXT PRIMARY KEY NOT NULL,
   day TEXT NOT NULL,
@@ -32,4 +29,3 @@ CREATE TABLE IF NOT EXISTS sanko_day_events (
   approved INTEGER NOT NULL DEFAULT 0 CHECK(approved IN (0,1)),
   updated_at INTEGER NOT NULL
 );
--- Never insert fictional or draft events as approved.
