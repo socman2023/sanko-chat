@@ -5,9 +5,10 @@ import {
  limitRetryAt, cleanConversationId, isAllowedOrigin
 } from "./lib.js";
 import { SANKO_CORE_RELATIONSHIPS } from "./sanko-core-relationships.js";
+import { canonLexical } from "./canon-store.js";
 import { adminFetch } from "./admin.js";
 
-const VERSION="sanko-worker-0.3.1";
+const VERSION="sanko-worker-0.4.0";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -362,8 +363,20 @@ async function chat(req,env,origin,ctx) {
     "На сегодня разговоров у меня уже через край. Завтра продолжим.";
   return respond({error:"quota_exhausted",reply,retryAt:admission.retryAt,conversationId:id},429,origin,env);
  }
- let hits=[];
- try{hits=await retrieve(env,question,scope);}catch(err){console.warn("Sanko RAG unavailable",err?.name);}
+ let vectorHits=[];
+ try{vectorHits=await retrieve(env,question,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
+ // Hybrid search: private complete archive in Sanko D1 + semantic Vectorize.
+ // Canon records are never stored in, or read from, Oleshka's private KV/D1.
+ let lexicalHits=[];
+ try{lexicalHits=await canonLexical(env,question,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
+ const seen=new Set();
+ const hits=[];
+ for(const hit of [...lexicalHits.slice(0,5),...vectorHits]) {
+  const key=String(hit.id||hit.source+"|"+hit.text.slice(0,120));
+  if(seen.has(key))continue;
+  seen.add(key);hits.push(hit);
+  if(hits.length>=12)break;
+ }
  const diary=await loadPublishedDiary(env,scope,question);
  const system=systemText(runtime,scope,hits,today,diary);
  const generated=await answerWithGemini(env,system,history,question);
