@@ -3,6 +3,7 @@
 // ADMIN_UPDATE_TOKEN secret. Never access DIARY_DB or Oleshka's chat logs.
 import { dayInMoscow, LIMITS } from "./lib.js";
 import { ADMIN_HTML, ADMIN_CSS, ADMIN_SCRIPT } from "./admin-ui.js";
+import { canonStats,canonImport } from "./canon-store.js";
 
 const cutoff = () => Math.floor(Date.now()/1000)-30*86400;
 const securityHeaders = {
@@ -40,9 +41,9 @@ async function adminAuthorized(req,env) {
  let different=0;for(let i=0;i<a.length;i++)different|=a[i]^b[i];
  return different===0;
 }
-async function jsonBody(req) {
+async function jsonBody(req,maxBytes=3000) {
  const raw=await req.text();
- if(new TextEncoder().encode(raw).byteLength>3000)throw Error("body_too_large");
+ if(new TextEncoder().encode(raw).byteLength>maxBytes)throw Error("body_too_large");
  try{return JSON.parse(raw||"{}");}catch{throw Error("invalid_json");}
 }
 async function hashedIP(req,env,day) {
@@ -137,8 +138,8 @@ export async function adminFetch(req,env) {
  const pathname=new URL(req.url).pathname;
  if(req.method==="GET") {
   if(pathname==="/admin")return Response.redirect(new URL("/admin/stats",req.url),302);
-  if(pathname==="/admin/stats"||pathname==="/admin/chats")
-    return page(ADMIN_HTML.replace("__PAGE__",pathname==="/admin/stats"?"stats":"chats"));
+  if(pathname==="/admin/stats"||pathname==="/admin/chats"||pathname==="/admin/knowledge")
+    return page(ADMIN_HTML.replace("__PAGE__",pathname==="/admin/stats"?"stats":pathname==="/admin/chats"?"chats":"knowledge"));
   if(pathname==="/admin/assets/style.css")return page(ADMIN_CSS,"text/css; charset=utf-8");
   if(pathname==="/admin/assets/app.js")return page(ADMIN_SCRIPT,"application/javascript; charset=utf-8");
   return reply({error:"not_found"},404);
@@ -150,11 +151,13 @@ export async function adminFetch(req,env) {
  if(!await adminAuthorized(req,env))return reply({error:"unauthorized"},401);
  if(!env.GUARD_DB?.prepare||!env.IP_HASH_SECRET)return reply({error:"database_unavailable"},503);
  let body={};
- try{body=await jsonBody(req);}catch(err){return reply({error:err.message||"bad_request"},400);}
+ try{body=await jsonBody(req,pathname==="/admin/knowledge/import"?175000:3000);}catch(err){return reply({error:err.message||"bad_request"},400);}
  try{
   if(pathname==="/admin/stats/data")return await stats(req,env);
   if(pathname==="/admin/chats/list")return await conversations(req,env,body);
   if(pathname==="/admin/chats/thread")return await thread(env,body);
+  if(pathname==="/admin/knowledge/status")return await canonStats(env);
+  if(pathname==="/admin/knowledge/import")return await canonImport(env,body);
   return reply({error:"not_found"},404);
  }catch(err){
   console.warn("Sanko admin query failed",err?.name||"unknown");
