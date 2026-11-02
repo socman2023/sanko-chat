@@ -201,3 +201,40 @@ test("Today diary includes morning plus afternoon, including text beyond 1900 ch
   assert(prompt.includes("wall850667816_2001"));
  }finally{globalThis.fetch=original;}
 });
+
+test("Entire published posts reach Gemini: 6k, 15k, >16k and >62k total",async()=>{
+ const today=dayInMoscow();
+ const makePost=(id,prefix,len,tail)=>({
+   post_id:id, owner_id:850667816, published_day_msk:today,
+   source_url:"https://vk.com/wall850667816_"+id,
+   source_text:prefix+"X".repeat(len-prefix.length-tail.length)+tail
+ });
+ // The Olleshka importer's usual posts are 5–6k; these longer fixtures
+ // prevent any future arbitrary source or aggregate cut at 16k/30k/62k.
+ const p1=makePost(3001,"Утром: ",6000,"КОНЕЦ_УТРА_3001");
+ const p2=makePost(3002,"После обеда: ",15500,"КОНЕЦ_ДНЯ_3002");
+ const p3=makePost(3003,"Вечером: ",21000,"КОНЕЦ_ВЕЧЕРА_3003");
+ const p4=makePost(3004,"Поздно вечером: ",24000,"КОНЕЦ_ПОЗДНО_3004");
+ const all=[p4,p3,p2,p1];
+ const {env,observed}=envStub({diary:true,diaryPosts:all});
+ const priorFetch=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+   observed.gemini.push({system:JSON.parse(init.body).systemInstruction.parts[0].text});
+   return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+     content:{parts:[{text:"Княжич вернулся. Дела сделали."}]}}]}),
+     {status:200,headers:{"Content-Type":"application/json"}});
+ };
+ try{
+   const r=await worker.fetch(req("А потом?"),env,ctx);
+   assert.equal(r.status,200);
+   const data=await r.json();
+   assert.equal(data.knowledge.diaryPosts,4);
+   const prompt=observed.gemini[0].system;
+   for(const post of all) {
+     assert(prompt.includes(post.source_text), "Post "+post.post_id+" must survive verbatim");
+     assert(prompt.includes("wall850667816_"+post.post_id));
+   }
+   assert(prompt.length>62000,"All diary content must survive old 62k prompt ceiling");
+   assert(!prompt.includes("Средняя часть длинной публикации пропущена"));
+ }finally{globalThis.fetch=priorFetch;}
+});
