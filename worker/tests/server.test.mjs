@@ -132,7 +132,7 @@ test("Sanko can read Oleshka's published diary read-only, without changing his D
    assert.match(observed.gemini[0].system,/Олешка написал в дневнике: перелетели Стену/);
    assert.match(observed.gemini[0].system,/Санко почти всегда рядом с Олешкой/);
    assert.match(observed.gemini[0].system,/улетел/);
-   assert.match(observed.gemini[0].system,/НЕ вставляй/);
+   assert.match(observed.gemini[0].system,/Без необходимости не называй источник сведений/);
    assert.equal(observed.insertions.length,1);
  }finally{globalThis.fetch=nativeFetch;}
 });
