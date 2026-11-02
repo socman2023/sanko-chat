@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Проверка сервера Санко</title>
+<style>
+:root{color-scheme:light;--ink:#20372c;--forest:#345d47;--paper:#fbf6e9}
+*{box-sizing:border-box}
+body{margin:0;background:#eee8d9;color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:760px;margin:36px auto;padding:26px;background:var(--paper);border:1px solid #cbbda4;border-radius:12px;box-shadow:0 14px 35px #132b1c17}
+h1{font-size:27px;margin:0 0 8px}
+h2{font-size:18px;margin:26px 0 10px}
+p{margin:8px 0 13px}
+.small{font-size:13px;color:#5f675f}
+button{border:0;border-radius:8px;padding:12px 18px;min-height:44px;font:inherit;cursor:pointer;background:var(--forest);color:white}
+button:disabled{opacity:.47;cursor:not-allowed}
+textarea{width:100%;min-height:82px;resize:vertical;font:inherit;padding:11px;border:1px solid #aca89b;border-radius:8px;background:#fffefb}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#e9e9df;border-radius:8px;padding:15px;min-height:70px}
+a{color:#3a6d50}
+button:focus-visible,textarea:focus-visible{outline:3px solid #a6793a;outline-offset:3px}
+@media(max-width:640px){main{margin:0;min-height:100dvh;padding:20px;border-radius:0}}
+</style>
+</head>
+<body>
+<main>
+<h1>Проверка сервера Санко</h1>
+<p>Это служебная страница. Она не меняет настройки Cloudflare и не затрагивает чат Олешки. Сообщения отправляются только в <strong>sanko-chat-api</strong>.</p>
+<p class="small">Проверка состояния не обращается к Gemini. Проверка диалога отправляет один запрос и учитывается в лимитах Санко — 500/15 000/100.</p>
+<h2>1. Состояние сервера</h2>
+<button id="check" type="button">Проверить сервер</button>
+<pre id="health" role="status">Проверка ещё не запускалась.</pre>
+<h2>2. Пробный диалог</h2>
+<label for="question">Тестовый вопрос Санко</label>
+<textarea id="question" maxlength="500">Здрав будь, Санко! Расскажи, кто ты, чем занимаешься в Академии и как относишься к Олешке.</textarea>
+<p><button id="chat" type="button" disabled>Проверить ответ Санко</button></p>
+<pre id="answer" role="status">Сначала проверь состояние сервера.</pre>
+<p class="small">Если сервер отвечает, но в ответе неузнаваемая речь Санко или перепутаны факты, это отдельно проверим по каноническому корпусу. Служебную страницу удалим после завершения тестирования.</p>
+<p><a href="../">Вернуться к оформлению чата Санко</a></p>
+</main>
+<script>
+(() => {
+  "use strict";
+  const API = "https://sanko-chat-api.boysinger2008.workers.dev";
+  const btnCheck=document.getElementById("check"), btnChat=document.getElementById("chat");
+  const health=document.getElementById("health"), answer=document.getElementById("answer");
+  const question=document.getElementById("question");
+  let configured=false,busy=false;
+  function setButtons(){btnCheck.disabled=busy;btnChat.disabled=busy||!configured;}
+  async function api(path,options={}) {
+    const ctrl=new AbortController();
+    const timeout=setTimeout(()=>ctrl.abort(),80000);
+    try {
+      const res=await fetch(API+path,{...options,signal:ctrl.signal,cache:"no-store"});
+      const raw=await res.text();
+      let data;
+      try{data=JSON.parse(raw)}catch{data={raw:raw.slice(0,900)}}
+      return {status:res.status,data};
+    }finally{clearTimeout(timeout);}
+  }
+  btnCheck.addEventListener("click",async()=>{
+    busy=true;configured=false;setButtons();health.textContent="Проверяю...";
+    try{
+      const result=await api("/health");
+      const d=result.data||{};
+      health.textContent="HTTP "+result.status+"\n"+
+       "Персонаж: "+(d.character||"не указан")+"\n"+
+       "Версия: "+(d.version||"не указана")+"\n"+
+       "Готовность конфигурации: "+String(d.configured)+"\n"+
+       (d.configured===false?"Профиль и/или bindings/secrets ещё нужно проверить.":"");
+      configured=result.status===200 && d.character==="sanko" && d.configured===true;
+      answer.textContent=configured?"Можно отправить один тестовый вопрос.":"Отправка сообщений заблокирована до успешной проверки.";
+    }catch(err){health.textContent="Не удалось обратиться к Worker: "+(err?.message||String(err));}
+    finally{busy=false;setButtons();}
+  });
+  btnChat.addEventListener("click",async()=>{
+    if(!configured||busy)return;
+    const msg=question.value.trim();
+    if(!msg)return;
+    busy=true;setButtons();answer.textContent="Отправляю вопрос...";
+    try{
+      const result=await api("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({message:msg,history:[],conversationId:crypto.randomUUID()})});
+      const d=result.data||{};
+      answer.textContent="HTTP "+result.status+"\n"+
+       (typeof d.reply==="string"?"Ответ Санко:\n"+d.reply+"\n\n":"")+
+       (typeof d.error==="string"?"Ошибка: "+d.error+"\n":"")+
+       (typeof d.model==="string"?"Модель: "+d.model+"\n":"")+
+       (d.knowledge?"Поиск: "+JSON.stringify(d.knowledge):"");
+    }catch(err){answer.textContent="Ошибка связи: "+(err?.message||String(err));}
+    finally{busy=false;setButtons();}
+  });
+})();
+</script>
+</body>
+</html>
