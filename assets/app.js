@@ -31,7 +31,7 @@
   const el = id => document.getElementById(id);
   const messages = el('messages'), input = el('input'), form = el('composer');
   const send = el('send'), newButton = el('new-chat'), dialog = el('new-dialog');
-  const confirmNew = el('confirm-new'), errorBox = el('error'), status = el('statusline');
+  const confirmNew = el('confirm-new'), errorBox = el('error');
   let conversation = [], conversationId = '', greetingId = 0, focusDate = '';
   let limitUntil = 0, busy = false, visitorRole = 'stranger', visitorName = '';
   let warnedPreview = false;
@@ -263,10 +263,6 @@
       greetingId = chooseGreeting(prev);
     }
     if (!PREVIEW) await initVk();
-    status.textContent = PREVIEW
-      ? 'Макет интерфейса · сервер Санко пока не подключён'
-      : 'Тестовый чат Санко · сообщения передаются на отдельный сервер';
-    status.classList.toggle('live', !PREVIEW);
     render(); resize(); save();
     if (limitUntil > Date.now()) { input.disabled = true; send.disabled = true; }
     else { input.disabled = false; send.disabled = false; }
