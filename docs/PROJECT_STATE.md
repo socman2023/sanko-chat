@@ -1,7 +1,7 @@
 # PROJECT_STATE — чат Санко
 
-Дата: 2026-11-01
-Этап: 4.2 / исходники отдельного Cloudflare Worker Санко подготовлены; Cloudflare deployment ещё не выполнен.
+Дата: 2026-11-02
+Этап: 4.3 / отдельный Cloudflare Worker Санко уже развёрнут, далее — создание собственной D1.
 
 ## Подтверждённое состояние
 
@@ -34,7 +34,7 @@
 - Актуальная инфраструктура Олешки работает и не изменялась. **Дополнительных скриншотов или перепроверок Олешки не требуется.**
 - План Санко: отдельный Worker `sanko-chat-api` и отдельная D1 для истории/лимитов, общие Workers AI, Vectorize и KV (персональный префикс ключей `sanko:`), отдельные знания `shared|sanko`.
 - [Полный окончательный отчёт шага 4.1](CLOUDFLARE_INVENTORY_2026-11-01.md).
-- **Исходники шага 4.2 подготовлены.** Следующее действие — создать независимый Cloudflare Worker `sanko-chat-api` из GitHub (ветка `main`, проект `sanko-chat-api`, deploy command `npx wrangler deploy`; поле Root directory в текущем UI отсутствует). После первоначального развертывания перейти к ресурсам Санко. Не менять текущий Worker Олешки.
+- **Шаг 4.2 полностью выполнен:** независимый Cloudflare Worker `sanko-chat-api` уже создан и развёрнут из GitHub (ветка `main`, `npx wrangler deploy`, root `/`). Адрес `https://sanko-chat-api.boysinger2008.workers.dev/` подтверждён Cloudflare Dashboard. Не менять текущий Worker Олешки.
 
 ## Этап 4.2 — сервер Санко (исходники в GitHub)
 
@@ -50,6 +50,16 @@
 - Корневая конфигурация `wrangler.toml` готова к первоначальному развёртыванию **нового Worker `sanko-chat-api`** без bindings и секретов. Начальный Worker будет отвечать `GET /health` с `configured:false` и отклонять сообщения 503 до подключения собственной D1, профиля Санко и общих знаний.
 - [README Worker и порядок предстоящего запуска](../worker/README.md).
 - **Олешка 3.9.1, его D1, KV, Vectorize и сайт не менялись**.
+
+## Этап 4.3 — создание D1 Санко (начат 2 ноября 2026)
+
+- Подтверждён существующий в Cloudflare Worker `sanko-chat-api`; домен workers.dev активен, сборка успешна.
+- В Dashboard пока показано 0 bindings. Это ожидаемо до создания отдельных данных и настройки общего доступа.
+- **Первое действие:** создать **только** новую D1 `heroes-chat-sanko` через Storage & Databases → D1 SQL Database → Create Database.
+- Следующее действие после появления ID: внести реальный `database_id` новой базы в **корневой** `wrangler.toml` с binding `GUARD_DB`. Не использовать ID `heroes-chat-guard`.
+- Затем применить `worker/migrations/0001_init.sql` к `heroes-chat-sanko` и проверить структуру.
+- Далее подключить существующие Workers AI, Vectorize `heroes-knowledge` и KV `heroes-chat-current` без изменения их содержимого.
+- После разрешения профиля Санко настроить его KV-ключи и секреты. До завершения настроек клиент остаётся макетом.
 
 ## Дальнейшие шаги
 
