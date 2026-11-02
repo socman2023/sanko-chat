@@ -15,6 +15,7 @@ export const ADMIN_HTML = String.raw`<!doctype html>
     <nav aria-label="Административные разделы">
       <a href="/admin/stats" id="statsNav">Статистика</a>
       <a href="/admin/chats" id="chatsNav">Разговоры</a>
+      <a href="/admin/knowledge" id="knowledgeNav">База знаний</a>
       <a href="https://socman2023.github.io/sanko-chat/">Открыть чат</a>
     </nav>
   </div>
@@ -42,6 +43,29 @@ export const ADMIN_HTML = String.raw`<!doctype html>
     <section class="panel"><div class="scroll"><table><thead><tr><th>Дата</th><th>Вопросов</th><th>IP</th><th>Нагрузка</th></tr></thead><tbody id="daily"></tbody></table></div></section>
     <h2>Модели и ответы за 30 дней</h2>
     <div class="twocol"><section class="panel"><h3>Использованные модели</h3><ul id="models"></ul></section><section class="panel"><h3>Статусы ответов</h3><ul id="statuses"></ul></section></div>
+  </div>
+  <div id="knowledge" hidden>
+    <h2>Полная база знаний Санко</h2>
+    <p class="hint">Загрузка исходного корпуса в личный индекс Санко. При этом записи Олешки не меняются. Книги и дневник хранятся только в закрытом D1 и Vectorize, не публикуются на сайте.</p>
+    <div class="cards">
+      <div class="card"><span>Фрагментов в базе</span><strong id="canonStored">—</strong></div>
+      <div class="card"><span>В поисковом индексе</span><strong id="canonIndexed">—</strong></div>
+    </div>
+    <section class="panel" style="margin-top:16px">
+      <h3>Импорт исходного корпуса</h3>
+      <label for="canonFile">Файл <code>sanko_canon_chunks.jsonl</code> из подготовленного пакета</label>
+      <input type="file" id="canonFile" accept=".jsonl,.txt,application/x-ndjson">
+      <p class="hint">Импорт выполняется пакетами по 8 фрагментов. Оставь вкладку открытой до завершения. При прерывании загрузку можно повторить.</p>
+      <label for="canonStart">Начать с номера фрагмента (0 — сначала, для возобновления)</label>
+      <input type="number" id="canonStart" min="0" step="1" value="0">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+       <button type="button" id="canonImport" disabled>Загрузить в базу Санко</button>
+       <button type="button" class="secondary" id="canonStop" disabled>Остановить после текущего пакета</button>
+      </div>
+      <progress id="canonProgress" value="0" max="100" style="width:100%;height:18px"></progress>
+      <p id="canonMessage" aria-live="polite" class="hint"></p>
+    </section>
+    <section class="panel" style="margin-top:16px"><h3>Проверка источников</h3><ul id="canonSources"></ul></section>
   </div>
   <div id="chats" hidden>
     <form id="searchForm" class="search">
@@ -180,16 +204,29 @@ export const ADMIN_SCRIPT = String.raw`
   $("next").disabled=offset+20>=d.total;
   $("pageInfo").textContent=d.total?((offset+1)+"–"+Math.min(d.total,offset+20)+" из "+d.total):"0";
  }
+ async function loadCanonStatus(){
+  const d=await api("/admin/knowledge/status");
+  $("knowledge").hidden=false;
+  val("canonStored",d.stored);val("canonIndexed",d.indexed);
+  const ul=$("canonSources");ul.replaceChildren();
+  for(const e of d.sources){
+    const li=el("li");li.append(el("span",e.source),el("strong",n(e.n??e.count)));ul.append(li);
+  }
+  $("canonImport").disabled=false;
+  $("canonMessage").textContent=d.indexed+" фрагментов готовы к поиску.";
+ }
  async function load() {
   if(loading)return;loading=true;$("load").disabled=true;
   message("Получаю данные…");
   try {
    if(area==="stats")showStatus(await api("/admin/stats/data"));
+   else if(area==="knowledge")await loadCanonStatus();
    else await loadThreads();
    unlocked=true;$("refresh").disabled=false;message("");
   }catch(err){
    message(err.message);if(area==="stats")$("stats").hidden=true;
    if(area==="chats")$("chats").hidden=true;
+   if(area==="knowledge")$("knowledge").hidden=true;
    unlocked=false;$("refresh").disabled=true;
   }finally{loading=false;$("load").disabled=false;}
  }
@@ -203,7 +240,42 @@ export const ADMIN_SCRIPT = String.raw`
   $("prev").addEventListener("click",()=>{if(offset<20)return;offset-=20;load();});
   $("next").addEventListener("click",()=>{offset+=20;load();});
  }
- const active=$(area==="stats"?"statsNav":"chatsNav");
+ if(area==="knowledge"){
+  let stopRequested=false,importing=false;
+  $("canonStop").addEventListener("click",()=>{stopRequested=true;});
+  $("canonImport").addEventListener("click",async()=>{
+   if(importing||!unlocked)return;
+   const file=$("canonFile").files?.[0];
+   if(!file){message("Выбери файл .jsonl с корпусом знаний.");return;}
+   importing=true;stopRequested=false;
+   $("canonImport").disabled=true;$("canonStop").disabled=false;
+   const p=$("canonProgress"),note=$("canonMessage");
+   try{
+    const raw=await file.text();
+    const rows=raw.split(/\r?\n/).filter(x=>x.trim()).map(line=>JSON.parse(line));
+    if(rows.length<1||rows.some(x=>typeof x.text!=="string"||!x.id))
+      throw Error("Неверный формат корпуса.");
+    const from=Number($("canonStart").value);
+    if(!Number.isInteger(from)||from<0||from>rows.length)throw Error("Неверная начальная позиция.");
+    p.max=rows.length;p.value=from;
+    for(let i=from;i<rows.length;i+=8){
+     if(stopRequested)break;
+     note.textContent="Загружено "+i+" из "+rows.length+". Не закрывай вкладку.";
+     const result=await api("/admin/knowledge/import",{records:rows.slice(i,i+8)});
+     if(!result.ok||result.indexed!==Math.min(8,rows.length-i))
+       throw Error("Ошибка индексации на фрагменте "+i);
+     p.value=Math.min(rows.length,i+8);$("canonStart").value=String(p.value);
+    }
+    await loadCanonStatus();
+    note.textContent=stopRequested?
+      "Приостановлено на фрагменте "+p.value+" из "+rows.length:
+      "Все "+rows.length+" фрагментов обработаны. Проверь число записей в индексе.";
+   }catch(err){note.textContent="Импорт остановлен: "+err.message+
+    " Повтори с позиции "+p.value+".";message(err.message);}
+   finally{importing=false;$("canonImport").disabled=false;$("canonStop").disabled=true;}
+  });
+ }
+ const active=$(area==="stats"?"statsNav":area==="chats"?"chatsNav":"knowledgeNav");
  if(active)active.setAttribute("aria-current","page");
 })();
 `;
