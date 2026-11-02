@@ -1,6 +1,6 @@
-# Cloudflare Worker Санко — шаг 4.2
+# Cloudflare Worker Санко — шаги 4.2–4.3
 
-**Статус:** исходники созданы в GitHub. **Сам Worker ещё предстоит создать в Cloudflare.** Первый deploy отделён от этапа подключения баз. Действующий Worker Олешки `3.9.1` и его D1 не менялись.
+**Статус на 02.11.2026:** `sanko-chat-api` успешно развёрнут из GitHub на отдельном `workers.dev`. Владелец создал D1 `heroes-chat-sanko` (ID `d566ac31-19ce-463f-80e5-6ed1b0d56b16`). Binding `GUARD_DB` и путь `worker/migrations` внесены в корневой `wrangler.toml`. **Таблицы ещё не созданы, применение SQL не подтверждено.** Секреты, AI, Vectorize и KV пока не подключены. Олешка 3.9.1 и его D1 не изменялись.
 
 ## Архитектура
 
@@ -8,7 +8,7 @@
 - Общий Workers AI binding: **`AI`** (будет подключён после первого bootstrap-деплоя).
 - Общий Vectorize: **`KNOWLEDGE` → `heroes-knowledge`** (будет подключён после первого bootstrap-деплоя).
 - Общий KV: **`CURRENT_CONTEXT` → `heroes-chat-current`**, только с ключами `sanko:*` (будет подключён позже).
-- **Отдельная D1**: `GUARD_DB` → **`heroes-chat-sanko`** (ещё не создана).
+- **Отдельная D1**: `GUARD_DB` → **`heroes-chat-sanko`** (создана, ID зафиксирован; схема таблиц ещё не применена).
 - Свой Gemini API key / Google AI project и отдельная финансовая учётная запись модели, по ранее принятой схеме.
 - Лимиты Санко **500 запросов в день, 15 000 в месяц, 100 с IP за день**. Лимиты Олешки неизменны и никак не расходуются обращениями к Санко.
 - Системный профиль и текущие сведения **не хранятся в публичном коде** — читаются из KV `sanko:profile:v1` и `sanko:current:v1`. После авторского утверждения загрузить туда пакет персонажа; пока профиль не загружен, POST /api/chat вернёт 503 и Gemini не расходуется.
@@ -54,7 +54,7 @@ npm run check
 
 ## Как создать сам Worker `sanko-chat-api` в Cloudflare (bootstrap)
 
-Текущий **корневой** `wrangler.toml` не содержит вымышленных ID ресурсов: его можно безопасно развернуть как **отдельный Worker**. Начальный `GET /health` покажет `configured:false`, а чат пока ответит `503`: это намеренно до подключения D1/KV/секретов.
+Корневой `wrangler.toml` содержит действующий ID **только новой D1 Санко**. `GET /health` пока показывает `configured:false`, а чат не обслуживает реальные запросы до подключения остальных ресурсов и профиля.
 
 1. В Cloudflare Dashboard открыть **Workers & Pages → Create application → GitHub** (вариант **Import existing Git repository**).
 2. Выбрать GitHub-аккаунт `socman2023`, репозиторий **`sanko-chat`**, ветку **`main`**.
@@ -68,10 +68,11 @@ npm run check
 
 ## Подготовка к этапу 4.3 / 4.4 (после создания Worker)
 
-1. Создать новую Cloudflare D1 **`heroes-chat-sanko`**; не касаться `heroes-chat-guard`.
-2. После создания ресурсов дополнить **корневой** `wrangler.toml` блоками Workers AI (`AI`), Vectorize (`KNOWLEDGE` → `heroes-knowledge`), KV (`CURRENT_CONTEXT` → `heroes-chat-current`) и D1 (`GUARD_DB` → **только новую** `heroes-chat-sanko`), с подлинными ID. Пока эти блоки намеренно отсутствуют, чтобы первый deploy прошёл без ложных значений.
-3. Применить схему **только к новой D1**, командой из каталога `worker`:
-   `npx wrangler d1 migrations apply heroes-chat-sanko --remote`.
+1. ✅ Создана отдельная D1 **`heroes-chat-sanko`** (база Олешки не затронута).
+2. ✅ В корневой `wrangler.toml` внесён D1 binding `GUARD_DB` и подлинный ID новой базы. AI, Vectorize и KV подключим позже.
+3. **Следующее действие:** применить схему **только к D1 Санко**. Из **корня репозитория**, где находится `wrangler.toml`, выполнить:
+   `npx wrangler d1 migrations apply heroes-chat-sanko --remote`
+   либо через Cloudflare D1 → `heroes-chat-sanko` → **Console** выполнить SQL из `worker/migrations/0001_init.sql`. При ручной SQL-загрузке `d1_migrations` не фиксируется автоматически; для последующих миграций это нужно учесть, чтобы не применять тот же файл повторно.
 4. Создать отдельный Google AI API key в собственном проекте Санко и положить его в Cloudflare Secret `GEMINI_API_KEY`; `IP_HASH_SECRET` — второй секрет, новый случайный длинный ключ. Не передавать их в чат и не класть в GitHub.
 5. После авторского утверждения поместить персональный профиль в KV key `sanko:profile:v1` и датированный срез в `sanko:current:v1`; пример формы для последнего: `{"asOf":"2026-10-31","text":"..."}`.
 6. Развернуть только `sanko-chat-api`, проверить `GET /`, `POST /api/chat` и фильтры. После этого обновить `assets/config.js` новым URL. До этой операции сайт остаётся честным макетом.
