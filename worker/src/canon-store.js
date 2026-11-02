@@ -1,7 +1,10 @@
 import { EMBEDDING_MODEL } from "./lib.js";
 const json=(x,s=200)=>new Response(JSON.stringify(x),{status:s,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
 export async function canonSetup(db){
- await db.prepare("CREATE TABLE IF NOT EXISTS sanko_canon_chunks (id TEXT PRIMARY KEY, source TEXT NOT NULL, scope TEXT NOT NULL, priority INTEGER NOT NULL, published_day TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, indexed INTEGER NOT NULL DEFAULT 0)").run();
+ await db.prepare("CREATE TABLE IF NOT EXISTS sanko_canon_chunks (id TEXT PRIMARY KEY, source TEXT NOT NULL, scope TEXT NOT NULL, priority INTEGER NOT NULL, published_day TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, search_text TEXT NOT NULL DEFAULT '', indexed INTEGER NOT NULL DEFAULT 0)").run();
+ const cols=await db.prepare("PRAGMA table_info(sanko_canon_chunks)").all();
+ if(cols?.results?.length&&!cols.results.some(x=>x.name==="search_text"))
+  await db.prepare("ALTER TABLE sanko_canon_chunks ADD COLUMN search_text TEXT NOT NULL DEFAULT ''").run();
 }
 export async function canonStats(env){
  try{
@@ -32,13 +35,14 @@ export async function canonImport(env,body) {
   return json({error:"missing_corpus_bindings"},503);
  try{await canonSetup(env.GUARD_DB);}catch{return json({error:"d1_schema_failed"},503);}
  const stmt="INSERT INTO sanko_canon_chunks "+
- "(id,source,scope,priority,published_day,title,content,indexed) "+
- "VALUES (?,?,?,?,?,?,?,0) ON CONFLICT(id) DO UPDATE SET "+
+ "(id,source,scope,priority,published_day,title,content,search_text,indexed) "+
+ "VALUES (?,?,?,?,?,?,?,?,0) ON CONFLICT(id) DO UPDATE SET "+
  "source=excluded.source,scope=excluded.scope,priority=excluded.priority,"+
- "published_day=excluded.published_day,title=excluded.title,content=excluded.content,indexed=0";
+ "published_day=excluded.published_day,title=excluded.title,content=excluded.content,"+
+ "search_text=excluded.search_text,indexed=0";
  try{
   const inserts=records.map(e=>env.GUARD_DB.prepare(stmt).bind(e.id,e.source,e.scope,
-    e.priority,e.date,e.title,e.text));
+    e.priority,e.date,e.title,e.text,(e.title+"\n"+e.text).toLocaleLowerCase("ru-RU")));
   if(env.GUARD_DB.batch)await env.GUARD_DB.batch(inserts);
   else for(const insert of inserts)await insert.run();
  }catch(err){console.warn("Sanko canon D1 failure",err?.name);return json({error:"d1_import_failed"},503);}
@@ -76,7 +80,7 @@ export async function canonLexical(env,question,max=6) {
  if(!terms.length)return [];
  try{
   const sql="SELECT id,source,scope,priority,published_day,content FROM sanko_canon_chunks "+
-   "WHERE "+terms.map(()=>"content LIKE ? ESCAPE '\\'").join(" OR ")+
+   "WHERE "+terms.map(()=>"search_text LIKE ? ESCAPE '\\'").join(" OR ")+
    " ORDER BY priority ASC,published_day DESC LIMIT ?";
   const args=terms.map(w=>"%"+w.replace(/[%_\\]/g,"\\$&")+"%");
   const r=await env.GUARD_DB.prepare(sql).bind(...args,max).all();
