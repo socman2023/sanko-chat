@@ -1,3 +1,22 @@
-// JavaScript source syntax is verified by the preceding node --check commands.
-// Integration and browser tests will be added after the Sanko API is available.
-console.log('JavaScript syntax checks completed. Browser and API tests are still pending.');
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read = path => readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const html=read('index.html'), app=read('assets/app.js');
+const config=read('assets/config.js'), worker=read('worker/src/index.js');
+const wrangler=read('wrangler.toml');
+assert(html.includes('./assets/config.js') && html.includes('./assets/app.js'));
+assert(html.includes('sanko-portrait.jpg'));
+assert(html.includes('Тестовый чат Санко'));
+assert(config.includes("apiUrl: 'https://sanko-chat-api.boysinger2008.workers.dev/api/chat'"));
+assert(!config.includes('oleshka-chat-api'));
+assert(app.includes("sanko-native-chat-v1"));
+assert(app.includes("const PREVIEW = !API"));
+assert(app.includes("status.classList.toggle('live', !PREVIEW)"));
+assert(app.includes("body.textContent = text"));
+assert(!app.includes('innerHTML'));
+assert(worker.includes('env.CURRENT_CONTEXT') && worker.includes('env.KNOWLEDGE'));
+assert(wrangler.includes('name = "sanko-chat-api"'));
+assert(wrangler.includes('database_name = "heroes-chat-sanko"'));
+assert(wrangler.includes('index_name = "heroes-knowledge"'));
+assert(wrangler.includes('binding = "CURRENT_CONTEXT"'));
+console.log('Sanko live chat UI static assertions passed.');
