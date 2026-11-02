@@ -5,7 +5,7 @@ import {
  limitRetryAt, cleanConversationId, isAllowedOrigin
 } from "./lib.js";
 
-const VERSION="sanko-worker-0.2.1";
+const VERSION="sanko-worker-0.2.2";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -135,11 +135,9 @@ function diaryTerms(question) {
    .filter(w=>!stop.has(w)))].slice(0,2);
 }
 function diaryBody(value) {
- const text=typeof value==="string"?value.trim():"";
- // Only extremely long posts need reduction; retain both beginning and end.
- if(text.length<=16000)return text;
- return text.slice(0,7800)+"\n[Средняя часть длинной публикации пропущена]\n"+
-   text.slice(-7800);
+ // Never truncate or modify published diary entries. The entire source_text
+ // saved by the existing Oleshka importer must reach Gemini unchanged.
+ return typeof value==="string"?value:"";
 }
 async function loadPublishedDiary(env,scope,question="") {
  if(!env.DIARY_DB?.prepare)return {available:false,posts:[]};
@@ -153,13 +151,13 @@ async function loadPublishedDiary(env,scope,question="") {
   if(day){
    // An explicit date: all relevant posts from that publication day first.
    rows.push(...await read(base+"AND published_day_msk=? "+
-     "ORDER BY published_at DESC,post_id DESC LIMIT 20",[850667816,day]));
+     "ORDER BY published_at DESC,post_id DESC",[850667816,day]));
   } else {
    // Current and previous day take PRIORITY over topic matches.
    // Follow-ups like "А потом?" now still see the whole recent day.
    const today=dayInMoscow(),yesterday=previousDiaryDay(today);
    rows.push(...await read(base+"AND published_day_msk=? "+
-     "ORDER BY published_at DESC,post_id DESC LIMIT 20",[850667816,today]));
+     "ORDER BY published_at DESC,post_id DESC",[850667816,today]));
    rows.push(...await read(base+"AND published_day_msk=? "+
      "ORDER BY published_at DESC,post_id DESC LIMIT 12",[850667816,yesterday]));
    const words=diaryTerms(question);
@@ -171,25 +169,18 @@ async function loadPublishedDiary(env,scope,question="") {
    }
    rows.push(...await read(base+"ORDER BY published_at DESC,post_id DESC LIMIT 12",[850667816]));
   }
-  const posts=[],seen=new Set();let total=0;
-  const maxChars=30000,maxPosts=16;
+  const posts=[],seen=new Set();
   for(const row of rows){
    const id=Number(row?.post_id);
    if(!Number.isSafeInteger(id)||id<=0||seen.has(id))continue;
    seen.add(id);
    const text=diaryBody(row.source_text);
    const stamp=String(row.published_day_msk||"");
-   if(!isRealDay(stamp)||!text)continue;
-   if(total+text.length>maxChars) {
-    // Leave the remaining space for at least a meaningful excerpt.
-    if(posts.length===0)continue;
-    continue;
-   }
+   if(!isRealDay(stamp)||!text.trim())continue;
    const source=String(row.source_url||"");
    const url=/^https:\/\/vk\.(?:com|ru)\/wall850667816_\d+$/.test(source)?source:"";
+   // Include every selected entry in FULL; no per-post or total character cap.
    posts.push({day:stamp,text,source:url,postId:id});
-   total+=text.length;
-   if(posts.length>=maxPosts)break;
   }
   return {available:true,posts};
  }catch(err){
@@ -280,7 +271,7 @@ function systemText(runtime,scope,hits,today,diary) {
   "Лучше «Поглядим сперва», чем длинное объяснение. "+
   "Не перебарщивай с говором, не изображай мудрого старика, не задавай обязательный вопрос в конце. "+
   "Обычно ты был рядом с Олешкой. Об общих событиях говори от себя; помни о случаях разлуки."
- ].join("\n\n").slice(0,62000);
+ ].join("\n\n"); // Preserve all supplied diary entries, including the final lines.
 }
 
 function modelList(env) {
