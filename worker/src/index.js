@@ -4,9 +4,10 @@ import {
  isRealDay, safeHistory, strictCharacterFilter, safeVectorMatches,
  limitRetryAt, cleanConversationId, isAllowedOrigin
 } from "./lib.js";
+import { SANKO_CORE_RELATIONSHIPS } from "./sanko-core-relationships.js";
 import { adminFetch } from "./admin.js";
 
-const VERSION="sanko-worker-0.3.0";
+const VERSION="sanko-worker-0.3.1";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -265,6 +266,7 @@ function systemText(runtime,scope,hits,today,diary) {
     "Слухи и планы отличай от случившегося.",
   "## Разрешённые факты мира и личные воспоминания\n"+
     (snippets||"В этом поиске подтверждённых фрагментов нет."),
+  "## Проверенная ЛИЧНАЯ история и знакомства Санко (приоритет над неполным старым профилем)\n"+SANKO_CORE_RELATIONSHIPS,
   "## КАК ОТВЕТИТЬ\nСанко не говорит длинными литературными фразами. "+
   "Не используй слова вроде «присматриваем», «посерьёзнее», «устроились у ручья» без естественной необходимости. "+
   "Не сообщай выдуманные текущие события. "+
