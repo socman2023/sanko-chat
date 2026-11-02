@@ -98,7 +98,7 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   const instructions=observed.gemini[0].system;
   assert.match(instructions,/одна или две короткие фразы/);
   assert.match(instructions,/примерно 8–30 слов/);
-  assert.match(instructions,/Дневник Олешки читаешь, но не всё в нём видел сам/);
+  assert.match(instructions,/Обычно ты был рядом с Олешкой/);
   assert.match(instructions,/Не сообщай выдуманные текущие события/);
   assert(!instructions.includes("Олешка написал в дневнике: перелетели Стену."));
 
@@ -130,7 +130,41 @@ test("Sanko can read Oleshka's published diary read-only, without changing his D
    assert(!/\b(UPDATE|DELETE|INSERT)\b/i.test(observed.diarySql));
    assert.deepEqual(observed.diaryParams,[850667816,"2026-10-31"]);
    assert.match(observed.gemini[0].system,/Олешка написал в дневнике: перелетели Стену/);
-   assert.match(observed.gemini[0].system,/«Олешка писал»/);
+   assert.match(observed.gemini[0].system,/Санко почти всегда рядом с Олешкой/);
+   assert.match(observed.gemini[0].system,/улетел/);
+   assert.match(observed.gemini[0].system,/НЕ вставляй/);
    assert.equal(observed.insertions.length,1);
  }finally{globalThis.fetch=nativeFetch;}
+});
+
+test("Undated query consults older published diary entries by topic and latest posts",async()=>{
+ const {env,observed}=envStub({diary:true});
+ const requests=[];
+ const base=env.DIARY_DB.prepare;
+ env.DIARY_DB.prepare=(sql)=>{
+   const stmt=base(sql);
+   const bind=stmt.bind;
+   stmt.bind=function(...values){
+     requests.push({sql,values});
+     return bind.apply(this,values);
+   };
+   return stmt;
+ };
+ const oldFetch=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+   observed.gemini.push({system:JSON.parse(init.body).systemInstruction.parts[0].text});
+   return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:"Помню. Разберёмся."}]}}]}),
+     {status:200,headers:{"Content-Type":"application/json"}});
+ };
+ try{
+  const r=await worker.fetch(req("А что там было с Мстиславом?"),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal(requests.length,2);
+  assert(requests.every(x=>x.sql.startsWith("SELECT ")));
+  assert(requests.every(x=>!/\b(?:UPDATE|DELETE|INSERT)\b/i.test(x.sql)));
+  assert.match(requests[0].sql,/source_text LIKE/);
+  assert.deepEqual(requests[0].values,[850667816,"%мстиславом%"]);
+  assert.deepEqual(requests[1].values,[850667816]);
+  assert.equal((await r.json()).knowledge.diaryPosts,1);
+ }finally{globalThis.fetch=oldFetch;}
 });
