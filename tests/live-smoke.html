@@ -69,6 +69,11 @@ button:focus-visible,textarea:focus-visible{outline:3px solid #a6793a;outline-of
        "Версия: "+(d.version||"не указана")+"\n"+
        "Готовность конфигурации: "+String(d.configured)+"\n"+
        "Дневник (binding): "+String(d.diaryConnected)+"\n"+
+       "Чтение D1: "+String(d.diarySync?.status||"нет данных")+"\n"+
+       "Последний день в D1: "+String(d.diarySync?.latestPostDay||"неизвестен")+"\n"+
+       "Последняя публикация: "+String(d.diarySync?.latestPublishedAt||"неизвестна")+"\n"+
+       "Загружена в D1: "+String(d.diarySync?.latestIngestedAt||"неизвестно")+"\n"+
+       "Записей за сегодня в D1: "+String(d.diarySync?.postsToday??"неизвестно")+"\n"+
        (d.configured===false?"Профиль и/или bindings/secrets ещё нужно проверить.":"");
       configured=result.status===200 && d.character==="sanko" && d.configured===true;
       answer.textContent=configured?"Можно отправить один тестовый вопрос.":"Отправка сообщений заблокирована до успешной проверки.";
