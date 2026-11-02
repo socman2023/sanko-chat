@@ -6,12 +6,14 @@ const config=read('assets/config.js'), worker=read('worker/src/index.js');
 const wrangler=read('wrangler.toml');
 assert(html.includes('./assets/config.js') && html.includes('./assets/app.js'));
 assert(html.includes('sanko-portrait.jpg'));
-assert(html.includes('Тестовый чат Санко'));
+assert(!html.includes('statusline'));
+assert(!html.includes('Тестовый чат Санко'));
+assert(!app.includes('сообщения передаются на отдельный сервер'));
 assert(config.includes("apiUrl: 'https://sanko-chat-api.boysinger2008.workers.dev/api/chat'"));
 assert(!config.includes('oleshka-chat-api'));
 assert(app.includes("sanko-native-chat-v1"));
 assert(app.includes("const PREVIEW = !API"));
-assert(app.includes("status.classList.toggle('live', !PREVIEW)"));
+
 assert(app.includes("body.textContent = text"));
 assert(!app.includes('innerHTML'));
 assert(worker.includes('env.CURRENT_CONTEXT') && worker.includes('env.KNOWLEDGE'));
