@@ -309,3 +309,25 @@ test("safety-blocked reply is not bypassed via fallback",async()=>{
   assert.equal(calls.length,1,"Do not hop models to bypass a safety block");
  }finally{globalThis.fetch=original;}
 });
+
+test("sanko personal relationships appear even without archive search",async()=>{
+ const {env,observed}=envStub();
+ env.KNOWLEDGE.query=async()=>({matches:[]});
+ const original=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  observed.gemini.push({system:JSON.parse(init.body).systemInstruction.parts[0].text});
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Помню Луну."}]}}]}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(req("А Ясмин?"),env,ctx);
+  assert.equal(response.status,200);
+  const prompt=observed.gemini[0].system;
+  for(const name of ["ЯСМИН = ЛУНА","БРОМ","ХАСИМ","СИЛЬВАРИЯ",
+    "РАДКО И РАМЕН","РАДА","СИНЕОКА","АНАСТАСИЙ","ТРОШКА",
+    "ВЛАСТОЯР","ОЛЕШКА","РАТША","ЯРКО","АЙОАН","РУМАН","ЭЛИНА"])
+   assert(prompt.includes(name),"Missing Sanko's relation: "+name);
+  assert(prompt.includes("01.08.2026"));
+  assert(prompt.includes("wall850667816_25792"));
+ }finally{globalThis.fetch=original;}
+});
