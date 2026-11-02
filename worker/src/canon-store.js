@@ -11,3 +11,57 @@ export async function canonStats(env){
   return json({ok:true,stored:Number(a?.n||0),indexed:Number(a?.indexed||0),sources:b?.results||[]});
  }catch{return json({error:"corpus_storage_unavailable"},503);}
 }
+
+const ALLOWED=new Set(["heroes_main.docx","heroes.docx","academy_first_semester_2026.docx",
+"academy_plan.docx","book1.docx","book2.docx","book3.docx","podnebesie_calendars.docx",
+"podnebesie_gods.docx","podnebesie_peoples.docx","blog.txt"]);
+const SCOPES=new Set(["characters","academy","books","world","diary"]);
+function valid(e) {
+ return e&&typeof e==="object"&&/^sk26-[a-f0-9]{30}$/.test(e.id||"")&&
+ ALLOWED.has(e.source)&&SCOPES.has(e.scope)&&typeof e.text==="string"&&
+ e.text.length>0&&e.text.length<=2600&&typeof e.title==="string"&&e.title.length<=160&&
+ Number.isInteger(e.priority)&&e.priority>=1&&e.priority<=9&&
+ typeof e.date==="string"&&(e.date===""||/^20\d\d-\d\d-\d\d$/.test(e.date));
+}
+export async function canonImport(env,body) {
+ const records=body?.records;
+ if(!Array.isArray(records)||records.length<1||records.length>8||!records.every(valid))
+  return json({error:"invalid_corpus_batch",batchMax:8},400);
+ if(new Set(records.map(e=>e.id)).size!==records.length)return json({error:"duplicate_ids"},400);
+ if(!env.GUARD_DB?.prepare||!env.AI?.run||!env.KNOWLEDGE?.upsert)
+  return json({error:"missing_corpus_bindings"},503);
+ try{await canonSetup(env.GUARD_DB);}catch{return json({error:"d1_schema_failed"},503);}
+ const stmt="INSERT INTO sanko_canon_chunks "+
+ "(id,source,scope,priority,published_day,title,content,indexed) "+
+ "VALUES (?,?,?,?,?,?,?,0) ON CONFLICT(id) DO UPDATE SET "+
+ "source=excluded.source,scope=excluded.scope,priority=excluded.priority,"+
+ "published_day=excluded.published_day,title=excluded.title,content=excluded.content,indexed=0";
+ try{
+  const inserts=records.map(e=>env.GUARD_DB.prepare(stmt).bind(e.id,e.source,e.scope,
+    e.priority,e.date,e.title,e.text));
+  if(env.GUARD_DB.batch)await env.GUARD_DB.batch(inserts);
+  else for(const insert of inserts)await insert.run();
+ }catch(err){console.warn("Sanko canon D1 failure",err?.name);return json({error:"d1_import_failed"},503);}
+ try{
+  const vectors=await env.AI.run(EMBEDDING_MODEL,{text:records.map(e=>e.title+"\n"+e.text)});
+  if(!Array.isArray(vectors?.data)||vectors.data.length!==records.length)
+    throw Error("embedding_count");
+  const chunks=records.map((e,i)=>{
+   const values=vectors.data[i];
+   if(!Array.isArray(values)||values.length!==1024||!values.every(Number.isFinite))
+     throw Error("embedding_shape");
+   return {id:e.id,values,metadata:{character:"sanko",source:e.source,
+      layer:e.scope,priority:e.priority,date:e.date,title:e.title,text:e.text}};
+  });
+  await env.KNOWLEDGE.upsert(chunks);
+ }catch(err){console.warn("Sanko canon embedding failure",err?.name);
+  return json({error:"vector_import_failed",stored:records.length,indexed:0},503);}
+ try{
+  const done=records.map(e=>env.GUARD_DB.prepare(
+    "UPDATE sanko_canon_chunks SET indexed=1 WHERE id=?").bind(e.id));
+  if(env.GUARD_DB.batch)await env.GUARD_DB.batch(done);
+  else for(const item of done)await item.run();
+ }catch(err){console.warn("Sanko canon status failure",err?.name);
+  return json({error:"status_write_failed",stored:records.length,indexed:records.length},503);}
+ return json({ok:true,stored:records.length,indexed:records.length});
+}
