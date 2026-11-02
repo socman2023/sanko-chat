@@ -19,6 +19,13 @@ database_name = "heroes-chat-sanko"
 database_id = "d566ac31-19ce-463f-80e5-6ed1b0d56b16"
 migrations_dir = "worker/migrations"
 
+# Existing Oleshka diary database: READ from Sanko code using SELECT only.
+# Does NOT change Oleshka's Worker, D1 schema, Cron or quotas.
+[[d1_databases]]
+binding = "DIARY_DB"
+database_name = "heroes-chat-guard"
+database_id = "3d356f87-0894-4c03-8dac-a3b82ae2ed6c"
+
 # Shared Workers AI catalog, same account as the working Oleshka Worker.
 [ai]
 binding = "AI"
