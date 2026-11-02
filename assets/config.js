@@ -1,3 +1,5 @@
-// Dedicated Sanko API will be configured in the Cloudflare integration stage.
-// Never use Oleshka API URL or place secrets in this public repository.
-window.SANKO_CONFIG = Object.freeze({ apiUrl: '' });
+// Sanko's independent Cloudflare API. No keys or private data in frontend.
+// Testing stage: real dialogue is enabled with the current Sanko Free Tier model.
+window.SANKO_CONFIG = Object.freeze({
+  apiUrl: 'https://sanko-chat-api.boysinger2008.workers.dev/api/chat'
+});
