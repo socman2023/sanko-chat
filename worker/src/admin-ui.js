@@ -91,3 +91,117 @@ footer{margin-top:30px;font-size:13px;color:#6b7067}
 @media(max-width:780px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.chatlayout,.twocol{grid-template-columns:1fr}.threads{max-height:38vh}}
 @media(max-width:430px){.cards{grid-template-columns:1fr 1fr}.card{padding:11px}.card strong{font-size:24px}.auth label,.search label{min-width:100%}}
 `;
+
+export const ADMIN_SCRIPT = String.raw`
+(() => {
+ "use strict";
+ const $=id=>document.getElementById(id);
+ const area=document.body.dataset.page;
+ const login=$("login"),status=$("status");
+ const token=$("token");
+ let unlocked=false,loading=false,offset=0,search="",selected="";
+ const n=x=>Number(x||0).toLocaleString("ru-RU");
+ const when=t=>t?new Date(t*1000).toLocaleString("ru-RU"):"—";
+ function message(text){status.textContent=text;}
+ function el(tag,text,cls) {
+  const x=document.createElement(tag);
+  if(text!==undefined)x.textContent=String(text);
+  if(cls)x.className=cls;
+  return x;
+ }
+ function val(id,v){$(id).textContent=n(v);}
+ async function api(path,body={}) {
+  const res=await fetch(path,{method:"POST",cache:"no-store",
+   headers:{"Authorization":"Bearer "+token.value,"Content-Type":"application/json"},
+   body:JSON.stringify(body)});
+  const data=await res.json().catch(()=>({error:"invalid_response"}));
+  if(!res.ok)throw Error(res.status===401?"Неверный административный токен или секрет ещё не настроен.":"Ошибка "+res.status+": "+(data.error||"нет ответа"));
+  return data;
+ }
+ function showStatus(data) {
+  val("today",data.today.admitted);val("week",data.week);val("month",data.month.admitted);
+  val("ip",data.today.fromThisIp);val("unique",data.today.uniqueIps);
+  val("conversations",data.conversations30d);
+  $("todayLeft").textContent="Осталось "+n(data.today.remaining)+" из "+n(data.limits.daily);
+  $("ipLeft").textContent="Осталось "+n(data.today.ipRemaining)+" из "+n(data.limits.ipDaily);
+  $("monthLeft").textContent="Осталось "+n(data.month.remaining)+" из "+n(data.limits.monthly);
+  const rows=$("daily");rows.replaceChildren();
+  const max=Math.max(1,...data.daily.map(x=>x.admitted));
+  data.daily.slice().reverse().forEach(x=>{
+    const tr=el("tr");
+    tr.append(el("td",x.day),el("td",n(x.admitted),"num"),el("td",n(x.uniqueIps),"num"));
+    const td=el("td");const bar=el("span",undefined,"meter");
+    bar.style.width=(100*x.admitted/max).toFixed(1)+"%";
+    td.appendChild(bar);tr.append(td);rows.append(tr);
+  });
+  for(const [id,entries,name] of [["models",data.models,"model"],["statuses",data.statuses,"status"]]){
+    const ul=$(id);ul.replaceChildren();
+    for(const x of entries){
+      const li=el("li");li.append(el("span",x[name]),el("strong",n(x.count)));ul.append(li);
+    }
+    if(!entries.length)ul.append(el("li","Пока нет данных."));
+  }
+  $("stats").hidden=false;
+ }
+ async function loadThread(id) {
+  selected=id;const box=$("transcript");box.replaceChildren(el("p","Загружаю переписку…","hint"));
+  try {
+   const d=await api("/admin/chats/thread",{conversationId:id});
+   box.replaceChildren();
+   for(const x of d.turns){
+    const item=el("article",undefined,"turn");
+    item.append(el("p",when(x.askedAt)+" · "+(x.model||x.status||"модель не указана")));
+    item.append(el("div",x.question,"bubble user"));
+    if(x.reply)item.append(el("div",x.reply,"bubble model"));
+    if(!x.reply)item.append(el("p","Ответ не был получен ("+x.status+")."));
+    box.append(item);
+   }
+   if(!d.turns.length)box.append(el("p","В этой переписке больше нет записей.","hint"));
+   for(const b of $("threads").querySelectorAll("button.thread"))b.setAttribute("aria-pressed",String(b.dataset.id===id));
+  }catch(err){box.replaceChildren(el("p",err.message,"hint"));}
+ }
+ async function loadThreads() {
+  const d=await api("/admin/chats/list",{query:search,offset,limit:20});
+  $("chats").hidden=false;
+  $("total").textContent="("+n(d.total)+")";
+  const list=$("threads");list.replaceChildren();
+  for(const x of d.threads){
+   const btn=el("button",undefined,"thread");btn.type="button";btn.dataset.id=x.conversationId;
+   btn.setAttribute("aria-pressed",String(x.conversationId===selected));
+   btn.append(el("small",when(x.lastAt)+" · "+x.turns+" репл."));
+   btn.append(el("strong",x.preview||"Без текста"));
+   btn.append(el("small",x.conversationId));
+   btn.addEventListener("click",()=>loadThread(x.conversationId));
+   list.append(btn);
+  }
+  if(!d.threads.length)list.append(el("p","Совпадений нет.","hint"));
+  $("prev").disabled=offset===0;
+  $("next").disabled=offset+20>=d.total;
+  $("pageInfo").textContent=d.total?((offset+1)+"–"+Math.min(d.total,offset+20)+" из "+d.total):"0";
+ }
+ async function load() {
+  if(loading)return;loading=true;$("load").disabled=true;
+  message("Получаю данные…");
+  try {
+   if(area==="stats")showStatus(await api("/admin/stats/data"));
+   else await loadThreads();
+   unlocked=true;message("");
+  }catch(err){
+   message(err.message);if(area==="stats")$("stats").hidden=true;
+   if(area==="chats")$("chats").hidden=true;
+   unlocked=false;
+  }finally{loading=false;$("load").disabled=false;}
+ }
+ login.addEventListener("submit",e=>{e.preventDefault();offset=0;load();});
+ if(area==="chats"){
+  $("searchForm").addEventListener("submit",e=>{
+   e.preventDefault();if(!unlocked)return;search=$("search").value.trim();offset=0;selected="";load();
+  });
+  $("reset").addEventListener("click",()=>{if(!unlocked)return;$("search").value="";search="";offset=0;selected="";load();});
+  $("prev").addEventListener("click",()=>{if(offset<20)return;offset-=20;load();});
+  $("next").addEventListener("click",()=>{offset+=20;load();});
+ }
+ const active=$(area==="stats"?"statsNav":"chatsNav");
+ if(active)active.setAttribute("aria-current","page");
+})();
+`;
