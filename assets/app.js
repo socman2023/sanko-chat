@@ -265,7 +265,7 @@
     if (!PREVIEW) await initVk();
     status.textContent = PREVIEW
       ? 'Макет интерфейса · сервер Санко пока не подключён'
-      : 'Разговор с Санко · сообщения передаются на отдельный сервер';
+      : 'Тестовый чат Санко · сообщения передаются на отдельный сервер';
     status.classList.toggle('live', !PREVIEW);
     render(); resize(); save();
     if (limitUntil > Date.now()) { input.disabled = true; send.disabled = true; }
