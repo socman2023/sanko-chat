@@ -16,5 +16,16 @@ database_name = "heroes-chat-sanko"
 database_id = "d566ac31-19ce-463f-80e5-6ed1b0d56b16"
 migrations_dir = "worker/migrations"
 
-# Additional AI / Vectorize / KV bindings will be configured separately.
-# Never commit Gemini, VK or IP hash secrets.
+# Shared Workers AI catalog, same account as the working Oleshka Worker.
+[ai]
+binding = "AI"
+
+# Reuse the shared world index, but query only character=shared/sanko.
+# No new Vectorize index is created and no indexed data is changed.
+[[vectorize]]
+binding = "KNOWLEDGE"
+index_name = "heroes-knowledge"
+
+# KV CURRENT_CONTEXT will be added when the existing heroes-chat-current
+# namespace ID is supplied. Do NOT invent an ID or create a duplicate.
+# No API secrets belong in this public repository.
