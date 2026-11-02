@@ -238,3 +238,74 @@ test("Entire published posts reach Gemini: 6k, 15k, >16k and >62k total",async()
    assert(!prompt.includes("Средняя часть длинной публикации пропущена"));
  }finally{globalThis.fetch=priorFetch;}
 });
+
+
+test("model fallback after 429: primary overloaded, first reserve succeeds",async()=>{
+ const {env,observed}=envStub();
+ env.GEMINI_MODEL_ORDER="gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash";
+ const calls=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async(url,init)=>{
+  const model=String(url).split("/models/")[1].split(":")[0];
+  calls.push({model,body:JSON.parse(init.body)});
+  if(calls.length===1)return new Response(JSON.stringify({error:{code:429,status:"RESOURCE_EXHAUSTED"}}),
+   {status:429,headers:{"Content-Type":"application/json"}});
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Я тут. Скажи, чего хотел?"}]}}]}),
+   {status:200,headers:{"Content-Type":"application/json"}});
+ };
+ try{
+  const response=await worker.fetch(req("Здрав будь, Санко."),env,ctx);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.model,"gemini-3.1-flash-lite");
+  assert.equal(data.fallbackUsed,true);
+  assert.equal(data.reply,"Я тут. Скажи, чего хотел?");
+  assert.deepEqual(calls.map(x=>x.model),["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
+  assert.deepEqual(calls[0].body.systemInstruction,calls[1].body.systemInstruction);
+  assert.deepEqual(calls[0].body.contents,calls[1].body.contents);
+  assert.equal(observed.insertions.length,1,"Fallback must consume one Sanko admission");
+ }finally{globalThis.fetch=original;}
+});
+
+test("fallback steps through transient error, empty and truncated replies to fourth model",async()=>{
+ const {env,observed}=envStub();
+ env.GEMINI_MODEL_ORDER="gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash";
+ const calls=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async(url)=>{
+  const model=String(url).split("/models/")[1].split(":")[0];
+  calls.push(model);
+  if(calls.length===1)return new Response(JSON.stringify({error:{code:503}}),{status:503});
+  if(calls.length===2)return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[]}}]}),{status:200});
+  if(calls.length===3)return new Response(JSON.stringify({candidates:[{finishReason:"MAX_TOKENS",content:{parts:[{text:"Only start"}]}}]}),{status:200});
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:"Ага. Разберёмся."}]}}]}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(req("Как дела?"),env,ctx);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.model,"gemini-3.8-flash");
+  assert.equal(data.fallbackUsed,true);
+  assert.deepEqual(calls,["gemini-3.5-flash-lite","gemini-3.1-flash-lite",
+   "gemini-3.6-flash","gemini-3.8-flash"]);
+  assert.equal(observed.insertions.length,1);
+ }finally{globalThis.fetch=original;}
+});
+
+test("safety-blocked reply is not bypassed via fallback",async()=>{
+ const {env}=envStub();
+ env.GEMINI_MODEL_ORDER="gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash";
+ const calls=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async(url)=>{
+  calls.push(String(url));
+  return new Response(JSON.stringify({candidates:[{finishReason:"SAFETY",content:{parts:[]}}]}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(req("Как поживаешь?"),env,ctx);
+  assert.equal(response.status,503);
+  assert.equal((await response.json()).error,"blocked");
+  assert.equal(calls.length,1,"Do not hop models to bypass a safety block");
+ }finally{globalThis.fetch=original;}
+});
