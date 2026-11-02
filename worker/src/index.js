@@ -4,8 +4,9 @@ import {
  isRealDay, safeHistory, strictCharacterFilter, safeVectorMatches,
  limitRetryAt, cleanConversationId, isAllowedOrigin
 } from "./lib.js";
+import { adminFetch } from "./admin.js";
 
-const VERSION="sanko-worker-0.2.3";
+const VERSION="sanko-worker-0.3.0";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -375,9 +376,12 @@ async function chat(req,env,origin,ctx) {
 }
 export default {
  async fetch(req,env,ctx) {
+  const path=new URL(req.url).pathname;
+  // Administrative pages have their own same-origin check and Bearer auth.
+  // The regular chat CORS policy must not block same-origin admin requests.
+  if(path==="/admin"||path.startsWith("/admin/"))return adminFetch(req,env);
   const origin=req.headers.get("Origin")||"";
   if(!isAllowedOrigin(origin,env.ALLOWED_ORIGIN))return new Response("Forbidden origin",{status:403});
-  const path=new URL(req.url).pathname;
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:headers(origin,env)});
   if(req.method==="GET"&&(path==="/"||path==="/health"))
    return respond({status:"ok",character:CHARACTER,version:VERSION,configured:ready(env),
