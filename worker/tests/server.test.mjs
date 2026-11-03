@@ -99,7 +99,15 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   const instructions=observed.gemini[0].system;
   assert.match(instructions,/одна или две короткие фразы/);
   assert.match(instructions,/примерно 8–30 слов/);
-  assert.match(instructions,/настоящий славонский говор/);
+  assert.match(instructions,/его говор слышен В ОБЫЧНЫХ разговорах/i);
+  assert.match(instructions,/В собственных фразах обычно предпочитай естественные для Санко формы/);
+  for(const word of ["шо","як","якой","токмо","тока","энто","энтот","ежли","тута","хто","куды"])
+   assert(instructions.includes(word),"Missing canon/author-approved form: "+word);
+  assert.match(instructions,/Ты шо, дырку протереть хошь/);
+  assert.match(instructions,/Про Тариба-то писать будете\? Як живет, шо творит/);
+  assert(!instructions.includes("Слова «шо», «анэ», «зело» допустимы в подходящей ситуации, иногда в шутку"));
+  assert(!instructions.includes("Не перебарщивай с говором"));
+  assert.match(instructions,/Голос Санко — обязательная постоянная манера речи/);
   assert.match(instructions,/Обычно ты был рядом с Олешкой/);
   assert.match(instructions,/Не сообщай выдуманные текущие события/);
   assert(!instructions.includes("Олешка написал в дневнике: перелетели Стену."));
@@ -561,7 +569,9 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(system.includes("1–2 короткие фразы"));
   assert(system.includes("Если спрашивают подробно — тогда расскажи подробнее"));
   assert(system.includes("Не повторяй всю последовательность приключений"));
-  assert(system.includes("настоящий славонский говор"));
+  assert(system.includes("Голос Санко — обязательная постоянная манера речи"));
+  assert(system.includes("Говори как Санко"));
+  assert(system.includes("ПРОВЕРЬ СВОЙ ОТВЕТ ПЕРЕД ОТПРАВКОЙ"));
   assert(system.includes("«шо»"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
  }finally{globalThis.fetch=old;}
