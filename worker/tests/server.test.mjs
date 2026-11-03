@@ -595,3 +595,54 @@ test("dates or admin phrases returned by Gemini never reach Sanko visitor",async
   assert.match(data.reply,/Покуда/);
  } finally {globalThis.fetch=before;}
 });
+
+
+test("plain generic Sanko answer gets ONE fact-constrained voice rewrite with both usages tracked",async()=>{
+ const {env,observed}=envStub({diary:true,diaryPosts:[{
+  post_id:14566,owner_id:850667816,published_day_msk:dayInMoscow(),published_at:Date.now()/1000,
+  source_url:"https://vk.ru/wall850667816_14566",
+  source_text:"Купец навел городскую стражу на ребят. Укрылись на складе у реки."
+ }]});
+ const prev=globalThis.fetch;
+ const requests=[];
+ globalThis.fetch=async(_url,init)=>{
+  const body=JSON.parse(init.body);
+  requests.push(body);
+  const answer=requests.length===1
+   ?"Эх, денек выдался! От стражи городского чинуши еле удрали, а ночлег теперь у местных воров на складе у реки."
+   :"Тот купчик стражу на нас навёл. Еле ноги унесли, а нынче тута на складе сидим.";
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:answer}]}}],
+   usageMetadata:{promptTokenCount:320,candidatesTokenCount:25,totalTokenCount:345}}),{status:200});
+ };
+ try {
+  const r=await worker.fetch(req("А чего вы бежали?"),env,ctx);
+  const data=await r.json();
+  assert.equal(r.status,200);
+  assert.equal(requests.length,2);
+  assert.match(data.reply,/нынче тута/);
+  assert(!data.reply.includes("чинуши"));
+  assert.equal(observed.usageInserts.length,2,"Count both original and editorial Gemini requests");
+  assert.equal(observed.usageInserts[1].values[4],"voice_rewrite_answered");
+  assert.equal(requests[1].generationConfig.maxOutputTokens,1536);
+  assert.match(requests[1].contents[0].parts[0].text,/Купец навел городскую стражу/);
+ }finally{globalThis.fetch=prev;}
+});
+
+test("a naturally short Sanko reply causes no extra token-consuming rewrite",async()=>{
+ const {env,observed}=envStub();
+ const prev=globalThis.fetch;let calls=0;
+ globalThis.fetch=async()=>{
+  calls++;
+  return new Response(JSON.stringify({
+   candidates:[{finishReason:"STOP",content:{parts:[{text:"Надо посмотреть."}]}}],
+   usageMetadata:{promptTokenCount:21,candidatesTokenCount:4,totalTokenCount:25}
+  }),{status:200});
+ };
+ try {
+  const r=await worker.fetch(req("Санко, шо там?"),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal((await r.json()).reply,"Надо посмотреть.");
+  assert.equal(calls,1);
+  assert.equal(observed.usageInserts.length,1);
+ }finally{globalThis.fetch=prev;}
+});
