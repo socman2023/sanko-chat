@@ -16,6 +16,7 @@ export const ADMIN_HTML = String.raw`<!doctype html>
       <a href="/admin/stats" id="statsNav">Статистика</a>
       <a href="/admin/chats" id="chatsNav">Разговоры</a>
       <a href="/admin/knowledge" id="knowledgeNav">База знаний</a>
+      <a href="/admin/profile" id="profileNav">Профиль Санко</a>
       <a href="https://socman2023.github.io/sanko-chat/">Открыть чат</a>
     </nav>
   </div>
@@ -66,6 +67,30 @@ export const ADMIN_HTML = String.raw`<!doctype html>
       <p id="canonMessage" aria-live="polite" class="hint"></p>
     </section>
     <section class="panel" style="margin-top:16px"><h3>Проверка источников</h3><ul id="canonSources"></ul></section>
+  </div>
+  <div id="profile" hidden>
+    <h2>Персональный профиль Санко</h2>
+    <p class="hint">Это отдельный личный профиль героя в KV, а не 2975 фрагментов мира. При замене сохраняется резервная копия старого профиля. Исходный файл остаётся на твоём компьютере, пока ты явно не нажмёшь кнопку публикации.</p>
+    <div class="cards">
+      <div class="card"><span>Символов в действующем профиле</span><strong id="profileChars">—</strong></div>
+      <div class="card"><span>Резервная копия</span><strong id="profileBackup">—</strong></div>
+    </div>
+    <section class="panel" style="margin-top:16px">
+      <h3>Действующая версия</h3>
+      <p id="profileVersion">—</p>
+      <p class="hint" id="profileHash"></p>
+    </section>
+    <section class="panel" style="margin-top:16px">
+      <h3>Проверка и публикация новой редакции</h3>
+      <label for="profileFile">Файл <code>SANKO_PROFILE_v0.4_AUTHOR_REVIEW.txt</code></label>
+      <input id="profileFile" type="file" accept=".txt,text/plain">
+      <p class="hint" id="profileSelection">Выбери файл, просмотри его и только затем публикуй. Прежний профиль сохраняется для отката.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+       <button id="profileActivate" type="button" disabled>Опубликовать профиль в KV</button>
+       <button id="profileRestore" class="secondary" type="button" disabled>Вернуть предыдущий профиль</button>
+      </div>
+      <p class="hint" id="profileMessage" role="status" aria-live="polite"></p>
+    </section>
   </div>
   <div id="chats" hidden>
     <form id="searchForm" class="search">
@@ -215,18 +240,30 @@ export const ADMIN_SCRIPT = String.raw`
   $("canonImport").disabled=false;
   $("canonMessage").textContent=d.indexed+" фрагментов готовы к поиску.";
  }
+ async function loadProfileStatus(){
+  const d=await api("/admin/profile/status");
+  $("profile").hidden=false;
+  val("profileChars",d.chars);
+  $("profileBackup").textContent=d.hasBackup?"Есть":"Нет";
+  $("profileVersion").textContent=d.version||"Не загружен";
+  $("profileHash").textContent=d.sha256?"SHA-256: "+d.sha256:"";
+  $("profileActivate").disabled=false;
+  $("profileRestore").disabled=!d.hasBackup;
+ }
  async function load() {
   if(loading)return;loading=true;$("load").disabled=true;
   message("Получаю данные…");
   try {
    if(area==="stats")showStatus(await api("/admin/stats/data"));
    else if(area==="knowledge")await loadCanonStatus();
+   else if(area==="profile")await loadProfileStatus();
    else await loadThreads();
    unlocked=true;$("refresh").disabled=false;message("");
   }catch(err){
    message(err.message);if(area==="stats")$("stats").hidden=true;
    if(area==="chats")$("chats").hidden=true;
    if(area==="knowledge")$("knowledge").hidden=true;
+   if(area==="profile")$("profile").hidden=true;
    unlocked=false;$("refresh").disabled=true;
   }finally{loading=false;$("load").disabled=false;}
  }
@@ -275,7 +312,46 @@ export const ADMIN_SCRIPT = String.raw`
    finally{importing=false;$("canonImport").disabled=false;$("canonStop").disabled=true;}
   });
  }
- const active=$(area==="stats"?"statsNav":area==="chats"?"chatsNav":"knowledgeNav");
+ if(area==="profile"){
+  $("profileFile").addEventListener("change",async()=>{
+   const file=$("profileFile").files?.[0];
+   if(!file){$("profileSelection").textContent="Файл не выбран.";return;}
+   $("profileSelection").textContent="Выбран "+file.name+" ("+n(file.size)+" байт). Для публикации будет отдельное подтверждение.";
+  });
+  $("profileActivate").addEventListener("click",async()=>{
+   if(!unlocked)return;
+   const file=$("profileFile").files?.[0];
+   if(!file){$("profileMessage").textContent="Выбери профиль в формате .txt.";return;}
+   const raw=await file.text();
+   if(raw.length<7500||raw.length>33000){
+    $("profileMessage").textContent="Длина профиля должна быть от 7500 до 33000 символов.";
+    return;
+   }
+   if(!window.confirm("Опубликовать новый профиль Санко в KV? Старый профиль будет сохранён для отката."))return;
+   $("profileActivate").disabled=true;
+   $("profileMessage").textContent="Сохраняю резервную копию и новый профиль...";
+   try{
+    const r=await api("/admin/profile/activate",{profile:raw});
+    await loadProfileStatus();
+    $("profileMessage").textContent=r.unchanged?"Профиль совпадает с действующим, запись не требовалась.":
+      "Новый профиль записан в KV. Символов: "+r.chars+". SHA-256: "+r.sha256;
+   }catch(e){$("profileMessage").textContent=e.message;}
+   finally{$("profileActivate").disabled=false;}
+  });
+  $("profileRestore").addEventListener("click",async()=>{
+   if(!unlocked)return;
+   if(!window.confirm("Вернуть сохранённую предыдущую редакцию профиля Санко?"))return;
+   $("profileRestore").disabled=true;
+   $("profileMessage").textContent="Восстанавливаю предыдущую редакцию...";
+   try{
+    const r=await api("/admin/profile/restore");
+    await loadProfileStatus();
+    $("profileMessage").textContent="Предыдущий профиль восстановлен. SHA-256: "+r.sha256;
+   }catch(e){$("profileMessage").textContent=e.message;}
+   finally{$("profileRestore").disabled=false;}
+  });
+ }
+ const active=$(area==="stats"?"statsNav":area==="chats"?"chatsNav":area==="knowledge"?"knowledgeNav":"profileNav");
  if(active)active.setAttribute("aria-current","page");
 })();
 `;
