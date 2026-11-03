@@ -16,15 +16,12 @@
   const LAST_GREETING_KEY = 'sanko-last-greeting-v1';
   const MAX_SAVED = 80;
   const MAX_CONTEXT = 12;
+  // Static opening lines are UI text, not Gemini replies. Keep them
+  // short and recognizably Sanko; never claim events or dates in greetings.
   const GREETINGS = [
-    'Здрав будь. О чём поговорим?',
-    'Ну, привет. Рассказывай, что у тебя нового.',
     'Здрав будь! Шо хотел спросить?',
-    'Привет. Говори, я слушаю.',
-    'Ну, здрав будь. Как у тебя дела?',
-    'А, привет! Есть дело ко мне?',
-    'Здрав будь. Ты о наших делах хотел узнать?',
-    'Ну вот, встретились. Рассказывай.'
+    'Здрав будь. Шо у тебя нового?',
+    'Здрав будь. Ну, говори.'
   ];
   // These are newly written UI examples, NOT quotations from the books.
 
