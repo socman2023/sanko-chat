@@ -302,7 +302,7 @@ async function geminiAttempt(env,model,timeout,system,contents) {
   const data=await response.json().catch(()=>null);
   if(!response.ok){
    const failure=classifyProviderError(response.status,data);
-   if(response.status===429)modelCooldowns.set(model,{until:Date.now()+
+   if(response.status===429)modelCooldowns.set(model+"|"+String(env.GEMINI_API_KEY),{until:Date.now()+
     (failure.kind==="provider_quota"?300000:30000),kind:failure.kind});
    console.warn("Sanko Gemini unavailable",JSON.stringify({model,status:response.status,kind:failure.kind}));
    return {ok:false,...failure};
@@ -325,7 +325,7 @@ async function answerWithGemini(env,system,history,question) {
  contents.push({role:"user",parts:[{text:question}]});
  let fallback=false,lastKind="provider_busy",anyQuota=false;
  for(const [model,timeout] of modelList(env)) {
-  const cooldown=modelCooldowns.get(model);
+  const cooldown=modelCooldowns.get(model+"|"+String(env.GEMINI_API_KEY));
   if(cooldown?.until>Date.now()){
    if(cooldown.kind==="provider_quota")anyQuota=true;
    fallback=true;continue;
