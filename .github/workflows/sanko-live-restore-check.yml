@@ -54,3 +54,26 @@ jobs:
            process.exit(1);
           }
           NODE
+      - name: Verify today's exact date query keeps latest dated diary
+        if: env.LIVE_HEALTH_OK == '1'
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const todayMoscow=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
+          const response=await fetch("https://sanko-chat-api.boysinger2008.workers.dev/api/chat",{
+           method:"POST",
+           headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
+           body:JSON.stringify({message:"Что сегодня было?",history:[],conversationId:crypto.randomUUID()})
+          });
+          const data=await response.json();
+          console.log(JSON.stringify({http:response.status,expectedToday:todayMoscow,
+            focusDate:data.knowledge?.focusDate,diaryPosts:data.knowledge?.diaryPosts,
+            model:data.model,reply:data.reply},null,2));
+          if(!response.ok||typeof data.reply!=="string"||!data.reply.trim())process.exit(1);
+          if(data.knowledge?.focusDate!==todayMoscow) {
+           console.error("Today date parser failed");process.exit(1);
+          }
+          if(!(Number(data.knowledge?.diaryPosts)>0)) {
+           console.error("Today question lost last available diary");process.exit(1);
+          }
+          NODE
