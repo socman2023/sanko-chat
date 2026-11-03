@@ -36,6 +36,7 @@
   let limitUntil = 0, busy = false, visitorRole = 'stranger', visitorName = '';
   let warnedPreview = false;
   let vkFirstName = '', vkFirstNameUserId = 0;
+  const FAILURE_NOTICE = 'Что-то связь не идёт. Загляни попозже, ладно?';
 
   function makeId() {
     if (crypto.randomUUID) return crypto.randomUUID();
@@ -66,7 +67,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
       if (Array.isArray(saved.messages)) {
-        conversation = saved.messages.filter(m => m && (m.role === 'user' || m.role === 'model') &&
+        conversation = saved.messages.filter(m => m && (m.role === 'user' || m.role === 'model' || m.role === 'notice') &&
           typeof m.text === 'string').slice(-MAX_SAVED);
       }
       if (typeof saved.conversationId === 'string' &&
@@ -94,10 +95,10 @@
   }
   function bubble(role, text, pending = false) {
     const wrap = document.createElement('div');
-    wrap.className = 'message ' + role + (pending ? ' pending' : '');
+    wrap.className = 'message ' + (role === 'notice' ? 'model' : role) + (pending ? ' pending' : '');
     const byline = document.createElement('div');
     byline.className = 'byline';
-    byline.textContent = role === 'user' ? 'Ты' : role === 'notice' ? 'Проверка интерфейса' : 'Санко';
+    byline.textContent = role === 'user' ? 'Ты' : role === 'notice' && PREVIEW ? 'Проверка интерфейса' : 'Санко';
     const body = document.createElement('div');
     body.className = 'bubble';
     body.textContent = text; // Untrusted content is never interpreted as HTML.
@@ -105,6 +106,12 @@
     messages.append(wrap);
     messages.scrollTop = messages.scrollHeight;
     return wrap;
+  }
+  function addNotice(text) {
+    bubble('notice', text);
+    conversation.push({role:'notice',text});
+    conversation = conversation.slice(-MAX_SAVED);
+    save();
   }
   function render() {
     messages.replaceChildren();
@@ -181,10 +188,10 @@
       input.focus();
       return;
     }
-    if (limitUntil > Date.now()) { error('Сегодня разговор пока недоступен. Загляни позже.'); return; }
+    if (limitUntil > Date.now()) { error(''); return; }
     if (limitUntil) limitUntil = 0;
 
-    const history = conversation.slice(-MAX_CONTEXT);
+    const history = conversation.filter(m => m.role === 'user' || m.role === 'model').slice(-MAX_CONTEXT);
     const userNode = bubble('user', question);
     const pending = bubble('model', 'Пишет…', true);
     input.value = '';
@@ -198,18 +205,29 @@
         body:JSON.stringify({message:question, history, focusDate, conversationId,
           greetingId, vkLaunch, vkFirstName, vkFirstNameUserId})
       });
-      const data = await response.json();
-      if (response.status === 429 && typeof data.reply === 'string' && data.reply.trim()) {
-        pending.remove();
-        bubble('model', data.reply);
-        conversation.push({role:'user',text:question},{role:'model',text:data.reply});
-        conversation = conversation.slice(-MAX_SAVED);
-        limitUntil = Number(data.retryAt) > Date.now() ? Number(data.retryAt) : Date.now()+3600000;
+      // A non-JSON Cloudflare error must never expose HTML or a technical message.
+      const data = await response.json().catch(() => null);
+      if (response.status === 429 && data?.error === 'quota_exhausted') {
+        pending.remove(); userNode.remove();
+        input.value = question; resize();
+        addNotice(typeof data.reply === 'string' && data.reply.trim() ?
+          data.reply : 'На сегодня разговоров у меня уже через край. Завтра продолжим.');
+        if (Number.isFinite(Number(data.retryAt)) && Number(data.retryAt) > Date.now())
+          limitUntil = Number(data.retryAt);
         save();
         return;
       }
-      if (!response.ok || typeof data.reply !== 'string' || !data.reply.trim()) {
-        throw new Error('Не получилось отправить сообщение. Попробуй ещё раз.');
+      if (!response.ok) {
+        pending.remove(); userNode.remove();
+        input.value = question; resize();
+        const allowed = ['provider_quota','provider_busy','service_unavailable',
+          'response_blocked'].includes(data?.error);
+        addNotice(allowed && typeof data?.reply === 'string' && data.reply.trim() ?
+          data.reply : FAILURE_NOTICE);
+        return;
+      }
+      if (typeof data?.reply !== 'string' || !data.reply.trim()) {
+        throw new Error('empty_response');
       }
       pending.remove();
       bubble('model', data.reply);
@@ -222,9 +240,7 @@
     } catch (ex) {
       pending.remove(); userNode.remove();
       input.value = question; resize();
-      error(ex.name === 'AbortError' ? 'Санко долго не отвечает. Попробуй ещё раз.' :
-        ex instanceof TypeError ? 'Нет связи с сервером. Проверь соединение.' :
-        ex.message);
+      addNotice(FAILURE_NOTICE);
     } finally {
       clearTimeout(t);
       setBusy(false);
@@ -240,12 +256,13 @@
     }
   });
   function clearChat() {
-    conversation = []; focusDate = ''; limitUntil = 0; warnedPreview = false;
+    conversation = []; focusDate = ''; warnedPreview = false;
     conversationId = makeId();
     greetingId = chooseGreeting(greetingId);
     if (!PREVIEW) { try { localStorage.removeItem(STORAGE_KEY); } catch (_) {} }
     save(); error(''); input.value=''; render(); resize();
-    input.disabled = false; send.disabled = false; input.focus();
+    input.disabled = limitUntil > Date.now(); send.disabled = limitUntil > Date.now();
+    if (!input.disabled) input.focus();
   }
   newButton.addEventListener('click', () => {
     if (busy) return;
