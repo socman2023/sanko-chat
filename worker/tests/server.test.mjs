@@ -107,7 +107,7 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert.match(instructions,/Про Тариба-то писать будете\? Як живет, шо творит/);
   assert(!instructions.includes("Слова «шо», «анэ», «зело» допустимы в подходящей ситуации, иногда в шутку"));
   assert(!instructions.includes("Не перебарщивай с говором"));
-  assert.match(instructions,/настоящий славонский говор/);
+  assert.match(instructions,/Голос Санко — обязательная постоянная манера речи/);
   assert.match(instructions,/Обычно ты был рядом с Олешкой/);
   assert.match(instructions,/Не сообщай выдуманные текущие события/);
   assert(!instructions.includes("Олешка написал в дневнике: перелетели Стену."));
