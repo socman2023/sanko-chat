@@ -9,10 +9,11 @@ import { canonLexical } from "./canon-store.js";
 import { adminFetch } from "./admin.js";
 import { extractUsage,recordUsage } from "./token-usage.js";
 import { SANKO_VOICE_RULES,SANKO_VOICE_REMINDER } from "./sanko-voice.js";
+import { needsVoiceRepair,makeVoiceRepairPrompt } from "./sanko-voice-check.js";
 import { guardSankoReply } from "./reply-guard.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.5.6";
+const VERSION="sanko-worker-0.5.7";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -327,13 +328,13 @@ function modelList(env) {
 // Best-effort per-isolate cooldown for models that recently returned 429.
 // This does NOT claim to enforce a global quota or know its reset time.
 const modelCooldowns=new Map();
-async function geminiAttempt(env,model,timeout,system,contents) {
+async function geminiAttempt(env,model,timeout,system,contents,outputLimit=4096) {
  try {
   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",{
    method:"POST",
    headers:{"Content-Type":"application/json","x-goog-api-key":String(env.GEMINI_API_KEY)},
    body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,
-    generationConfig:{maxOutputTokens:4096,thinkingConfig:{thinkingLevel:"low"}}}),
+    generationConfig:{maxOutputTokens:outputLimit,thinkingConfig:{thinkingLevel:"low"}}}),
    signal:AbortSignal.timeout(timeout)
   });
   const data=await response.json().catch(()=>null);
@@ -379,6 +380,27 @@ async function answerWithGemini(env,system,history,question) {
   fallback=true;
  }
  return {ok:false,reason:anyQuota?"provider_quota":lastKind,attempts};
+}
+// One extra Free Tier call only when the first answer fails the contextual voice gate.
+// A failed rewrite never forces an invented event or exposes metadata.
+async function refineSankoVoice(env,generated,question,history,diary,hits) {
+ if(!generated.ok||!needsVoiceRepair(generated.reply))return generated;
+ const evidence=[
+  ...(diary?.posts||[]).slice(0,5).map(x=>x.day+" "+String(x.text||"").slice(0,900)),
+  ...(hits||[]).slice(0,3).map(x=>String(x.text||"").slice(0,550))
+ ].join("\n").slice(0,4700);
+ const prompt=makeVoiceRepairPrompt(question,generated.reply,history,evidence);
+ const result=await geminiAttempt(env,generated.model,12000,prompt.system,
+  [{role:"user",parts:[{text:prompt.request}]}],1536);
+ generated.attempts.push({model:generated.model,
+  status:result.ok?"voice_rewrite_answered":"voice_rewrite_"+(result.kind||"unavailable"),
+  attemptedAt:Math.floor(Date.now()/1000),usage:result.usage||null});
+ if(!result.ok)return generated;
+ const revised=guardSankoReply(result.reply);
+ const words=revised.reply.trim().split(/\s+/u).filter(Boolean).length;
+ // Safety and bounded length first; don't mechanically replace any words.
+ if(revised.blocked||words>42||!revised.reply)return generated;
+ return {...generated,reply:revised.reply,voiceRewritten:true};
 }
 async function verifyVk(launch,env) {
  if(!env.VK_APP_SECRET||!env.VK_APP_ID||typeof launch!=="string"||launch.length>3000)return null;
@@ -440,7 +462,8 @@ async function chat(req,env,origin,ctx) {
  }
  const diary=await loadPublishedDiary(env,scope,question);
  const system=systemText(runtime,scope,hits,today,diary);
- const generated=await answerWithGemini(env,system,history,question);
+ const initial=await answerWithGemini(env,system,history,question);
+ const generated=await refineSankoVoice(env,initial,question,history,diary,hits);
  await recordUsage(env,admission.id,generated.attempts);
  if(!generated.ok) {
   await storeTurn(env,id,admission.id,question,"","","error");
