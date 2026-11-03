@@ -623,6 +623,7 @@ test("plain generic Sanko answer gets ONE fact-constrained voice rewrite with bo
   assert(!data.reply.includes("чинуши"));
   assert.equal(observed.usageInserts.length,2,"Count both original and editorial Gemini requests");
   assert.equal(observed.usageInserts[1].values[4],"voice_rewrite_answered");
+  assert.equal(observed.usageInserts[1].values[3],"gemini-3.6-flash");
   assert.equal(requests[1].generationConfig.maxOutputTokens,1536);
   assert.match(requests[1].contents[0].parts[0].text,/Купец навел городскую стражу/);
  }finally{globalThis.fetch=prev;}
