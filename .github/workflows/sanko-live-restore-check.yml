@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
-      - name: Wait for production Worker 0.5.7 and inspect diary freshness
+      - name: Wait for production Worker 0.5.8 and inspect diary freshness
         shell: bash
         env:
           LIVE_HEALTH: https://sanko-chat-api.boysinger2008.workers.dev/health
@@ -18,7 +18,7 @@ jobs:
           set -eu
           for attempt in $(seq 1 24); do
             body="$(curl -fsS --max-time 10 "$LIVE_HEALTH" || true)"
-            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.5.7" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.5.8" and .diarySync.status=="ok"' >/dev/null 2>&1; then
               printf '%s' "$body" | jq '{version,configured,diaryConnected,diarySync}'
               echo "LIVE_HEALTH_OK=1" >> "$GITHUB_ENV"
               exit 0
@@ -26,7 +26,7 @@ jobs:
             echo "Live Worker version / diary not ready (attempt $attempt of 24)."
             sleep 10
           done
-          echo "Unable to independently confirm current Worker 0.5.7 with diary access" >&2
+          echo "Unable to independently confirm current Worker 0.5.8 with diary access" >&2
           exit 1
       - name: One controlled Sanko dialogue smoke test
         if: env.LIVE_HEALTH_OK == '1'
@@ -90,7 +90,7 @@ jobs:
            const count=reply.trim().split(/\s+/u).length;
            if(count>35)throw Error("Ordinary Sanko answer too long: "+count);
            if(dates.test(reply))throw Error("Character leaked calendar date");
-           if(/чинуш|сполохом\s+им\s+глаза|доступным\s+записям/iu.test(reply))
+           if(/чинуш|чинот|сполохом\s+им\s+глаза|доступным\s+записям/iu.test(reply))
             throw Error("Character leaked generic / ungrounded construction");
            if(dialect.test(reply))dialectTurns++;
            history.push({role:"user",text:question},{role:"model",text:reply});
