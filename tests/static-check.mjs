@@ -15,6 +15,18 @@ assert(app.includes("sanko-native-chat-v1"));
 assert(app.includes("const PREVIEW = !API"));
 
 assert(app.includes("body.textContent = text"));
+
+assert(app.includes("const data = await response.json().catch(() => null)"),
+  'Cloudflare HTML errors must not leak as JSON parsing exceptions');
+assert(app.includes("m.role === 'user' || m.role === 'model')"),
+  'Only real conversation turns may reach Gemini');
+assert(app.includes("conversation.push({role:'notice',text})"),
+  'Service notices must be stored separately from dialogue');
+assert(app.includes("data?.error === 'quota_exhausted'"),
+  'Own daily/monthly limits must use server-confirmed 429 only');
+assert(app.includes("addNotice(FAILURE_NOTICE)"),
+  'Network and non-JSON failures require Sanko fallback speech');
+
 assert(!app.includes('innerHTML'));
 assert(worker.includes('env.CURRENT_CONTEXT') && worker.includes('env.KNOWLEDGE'));
 assert(wrangler.includes('name = "sanko-chat-api"'));
