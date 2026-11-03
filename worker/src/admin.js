@@ -5,6 +5,7 @@ import { dayInMoscow, LIMITS } from "./lib.js";
 import { ADMIN_HTML, ADMIN_CSS, ADMIN_SCRIPT } from "./admin-ui.js";
 import { canonStats,canonImport } from "./canon-store.js";
 import { profileStatus,activateProfile,restoreProfile } from "./profile-admin.js";
+import { tokenStats } from "./token-usage.js";
 
 const cutoff = () => Math.floor(Date.now()/1000)-30*86400;
 const securityHeaders = {
@@ -85,7 +86,7 @@ async function stats(req,env) {
   conversations30d:count(threads?.n),
   models:(models?.results||[]).map(x=>({model:String(x.model||"нет данных"),count:count(x.n)})),
   statuses:(turnStatus?.results||[]).map(x=>({status:String(x.status||"неизвестно"),count:count(x.n)})),
-  daily});
+  daily,tokenUsage:await tokenStats(db,today)});
 }
 function validUUID(s) {
  return typeof s==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
