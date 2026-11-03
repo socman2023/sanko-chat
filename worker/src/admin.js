@@ -4,6 +4,7 @@
 import { dayInMoscow, LIMITS } from "./lib.js";
 import { ADMIN_HTML, ADMIN_CSS, ADMIN_SCRIPT } from "./admin-ui.js";
 import { canonStats,canonImport } from "./canon-store.js";
+import { profileStatus,activateProfile,restoreProfile } from "./profile-admin.js";
 
 const cutoff = () => Math.floor(Date.now()/1000)-30*86400;
 const securityHeaders = {
@@ -138,8 +139,8 @@ export async function adminFetch(req,env) {
  const pathname=new URL(req.url).pathname;
  if(req.method==="GET") {
   if(pathname==="/admin")return Response.redirect(new URL("/admin/stats",req.url),302);
-  if(pathname==="/admin/stats"||pathname==="/admin/chats"||pathname==="/admin/knowledge")
-    return page(ADMIN_HTML.replace("__PAGE__",pathname==="/admin/stats"?"stats":pathname==="/admin/chats"?"chats":"knowledge"));
+  if(pathname==="/admin/stats"||pathname==="/admin/chats"||pathname==="/admin/knowledge"||pathname==="/admin/profile")
+    return page(ADMIN_HTML.replace("__PAGE__",pathname==="/admin/stats"?"stats":pathname==="/admin/chats"?"chats":pathname==="/admin/knowledge"?"knowledge":"profile"));
   if(pathname==="/admin/assets/style.css")return page(ADMIN_CSS,"text/css; charset=utf-8");
   if(pathname==="/admin/assets/app.js")return page(ADMIN_SCRIPT,"application/javascript; charset=utf-8");
   return reply({error:"not_found"},404);
@@ -151,13 +152,16 @@ export async function adminFetch(req,env) {
  if(!await adminAuthorized(req,env))return reply({error:"unauthorized"},401);
  if(!env.GUARD_DB?.prepare||!env.IP_HASH_SECRET)return reply({error:"database_unavailable"},503);
  let body={};
- try{body=await jsonBody(req,pathname==="/admin/knowledge/import"?175000:3000);}catch(err){return reply({error:err.message||"bad_request"},400);}
+ try{body=await jsonBody(req,pathname==="/admin/knowledge/import"?175000:pathname==="/admin/profile/activate"?120000:3000);}catch(err){return reply({error:err.message||"bad_request"},400);}
  try{
   if(pathname==="/admin/stats/data")return await stats(req,env);
   if(pathname==="/admin/chats/list")return await conversations(req,env,body);
   if(pathname==="/admin/chats/thread")return await thread(env,body);
   if(pathname==="/admin/knowledge/status")return await canonStats(env);
   if(pathname==="/admin/knowledge/import")return await canonImport(env,body);
+  if(pathname==="/admin/profile/status")return await profileStatus(env);
+  if(pathname==="/admin/profile/activate")return await activateProfile(env,body);
+  if(pathname==="/admin/profile/restore")return await restoreProfile(env);
   return reply({error:"not_found"},404);
  }catch(err){
   console.warn("Sanko admin query failed",err?.name||"unknown");
