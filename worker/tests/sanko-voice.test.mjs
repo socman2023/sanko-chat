@@ -17,12 +17,12 @@ test("voice rules use only verified blog quotes and explicitly author-approved w
  for(const quote of verified)assert(SANKO_VOICE_RULES.includes(quote),"Missing attested voice quote "+quote);
  for(const special of ["якой","токмо","энтот"])
   assert(SANKO_VOICE_RULES.includes(special),"Missing author's correction: "+special);
- assert(SANKO_VOICE_RULES.includes("не были"),"Explicitly distinguish words absent from uploaded blog");
+ assert.match(SANKO_VOICE_RULES,/Более новые авторские уточнения голоса имеют приоритет/);
 });
 test("voice preferences are habitual, not optional joke words",()=>{
  assert.match(SANKO_VOICE_RULES,/В ОБЫЧНЫХ разговорах/);
  assert.match(SANKO_VOICE_RULES,/обычно предпочитай/);
- assert.doesNotMatch(SANKO_VOICE_RULES,/редкие декоративные словечки\./);
+ assert.match(SANKO_VOICE_RULES,/НЕ редкие декоративные словечки/);
  assert.match(SANKO_VOICE_REMINDER,/сплошного литературного/);
  assert.match(SANKO_VOICE_REMINDER,/Не имитируй карикатурный говор/);
 });
