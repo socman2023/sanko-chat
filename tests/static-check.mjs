@@ -13,6 +13,15 @@ assert(config.includes("apiUrl: 'https://sanko-chat-api.boysinger2008.workers.de
 assert(!config.includes('oleshka-chat-api'));
 assert(app.includes("sanko-native-chat-v1"));
 assert(app.includes("const PREVIEW = !API"));
+assert(!app.includes("'Ну, здрав будь. Как у тебя дела?'"),
+  'Old literary Russian greeting must not be served to Sanko visitors');
+assert(!app.includes("'Привет. Говори, я слушаю.'"),
+  'Remove generic ChatGPT-style greeting');
+assert(app.includes("'Здрав будь! Шо хотел спросить?'"),
+  'Opening needs a recognizable Sanko voice');
+assert(app.includes("'Здрав будь. Шо у тебя нового?'"),
+  'Opening must not invent recent events');
+
 
 assert(app.includes("body.textContent = text"));
 
