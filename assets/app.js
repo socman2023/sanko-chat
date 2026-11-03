@@ -21,7 +21,6 @@
   const GREETINGS = [
     'Здрав будь! Шо хотел спросить?',
     'Здрав будь. Шо у тебя нового?',
-    'Здрав будь! Як дела?',
     'Здрав будь. Ну, говори.'
   ];
   // These are newly written UI examples, NOT quotations from the books.
