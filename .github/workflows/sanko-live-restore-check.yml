@@ -1,0 +1,56 @@
+name: Verify Sanko live restoration
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[sanko-live-check]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Wait for production Worker 0.5.2 and inspect diary freshness
+        shell: bash
+        env:
+          LIVE_HEALTH: https://sanko-chat-api.boysinger2008.workers.dev/health
+        run: |
+          set -eu
+          for attempt in $(seq 1 24); do
+            body="$(curl -fsS --max-time 10 "$LIVE_HEALTH" || true)"
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.5.2" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+              printf '%s' "$body" | jq '{version,configured,diaryConnected,diarySync}'
+              echo "LIVE_HEALTH_OK=1" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Live Worker version / diary not ready (attempt $attempt of 24)."
+            sleep 10
+          done
+          echo "Unable to independently confirm current Worker 0.5.2 with diary access" >&2
+          exit 1
+      - name: One controlled Sanko dialogue smoke test
+        if: env.LIVE_HEALTH_OK == '1'
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const response=await fetch("https://sanko-chat-api.boysinger2008.workers.dev/api/chat",{
+           method:"POST",
+           headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
+           body:JSON.stringify({
+            message:"Что ты помнишь из самых последних событий? Только без старых приключений.",
+            history:[],conversationId:crypto.randomUUID()
+           })
+          });
+          const data=await response.json();
+          console.log(JSON.stringify({
+           http:response.status,model:data.model,
+           diaryPosts:data.knowledge?.diaryPosts,
+           focusDate:data.knowledge?.focusDate,
+           reply:data.reply
+          },null,2));
+          if(!response.ok || typeof data.reply!=="string" || !data.reply.trim())process.exit(1);
+          if(!(Number(data.knowledge?.diaryPosts)>0)){
+           console.error("No current/latest diary supplied to Gemini");
+           process.exit(1);
+          }
+          NODE
