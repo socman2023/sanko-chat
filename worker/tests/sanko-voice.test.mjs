@@ -2,32 +2,26 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { SANKO_VOICE_RULES,SANKO_VOICE_REMINDER } from "../src/sanko-voice.js";
 
-test("voice rules use only verified blog quotes and explicitly author-approved words",()=>{
- const verified=[
-  "Ты шо, дырку протереть хошь?",
+test("Sanko voice uses natural phrases and preserves author-approved vocabulary",()=>{
+ for(const quote of ["Ты шо, дырку протереть хошь?",
   "Про Тариба-то писать будете? Як живет, шо творит",
   "Ты энто… тута помедленней",
   "Мене тож свет нужон!",
-  "Ты ентова… поможешь али нет?",
-  "Тады уха наваристая выйдет",
-  "Охолонись, брат. По порядку: хто приплыл, куды приехал?",
-  "С энтим Шан-Карой надоть ухо востро держать",
-  "Пишу, як обещал брату"
- ];
- for(const quote of verified)assert(SANKO_VOICE_RULES.includes(quote),"Missing attested voice quote "+quote);
- for(const special of ["якой","токмо","энтот"])
-  assert(SANKO_VOICE_RULES.includes(special),"Missing author's correction: "+special);
- assert.match(SANKO_VOICE_RULES,/Более новые авторские уточнения голоса имеют приоритет/);
+  "Охолонись, брат. По порядку: хто приплыл, куды приехал?"])
+  assert(SANKO_VOICE_RULES.includes(quote),quote);
+ for(const word of ["якой","токмо","энтот"])
+  assert(SANKO_VOICE_RULES.includes(word),word);
+ assert.match(SANKO_VOICE_RULES,/не переводишь их на говор/);
+ assert.match(SANKO_VOICE_RULES,/Никакого нарочитого коверкания слов/);
 });
-test("voice preferences are habitual, not optional joke words",()=>{
- assert.match(SANKO_VOICE_RULES,/В ОБЫЧНЫХ разговорах/);
- assert.match(SANKO_VOICE_RULES,/обычно предпочитай/);
- assert.match(SANKO_VOICE_RULES,/НЕ редкие декоративные словечки/);
- assert.match(SANKO_VOICE_REMINDER,/сплошного литературного/);
- assert.match(SANKO_VOICE_REMINDER,/Не имитируй карикатурный говор/);
+test("Sanko never speaks calendar dates or the diary bookkeeping",()=>{
+ assert.match(SANKO_VOICE_RULES,/Никогда не называй календарные даты/);
+ assert.match(SANKO_VOICE_RULES,/даже если человек прямо спрашивает/);
+ assert.match(SANKO_VOICE_REMINDER,/НИКАКИХ календарных дат/);
+ assert.match(SANKO_VOICE_RULES,/Не говори «за энту дату»/);
 });
-test("speech rule retains concise answers without arbitrary truncation",()=>{
+test("Sanko remains brief unless more detail is requested",()=>{
  assert.match(SANKO_VOICE_RULES,/8–30 слов/);
  assert.match(SANKO_VOICE_REMINDER,/8–30 слов/);
- assert.match(SANKO_VOICE_RULES,/подробно рассказывай только по прямой просьбе/);
+ assert.match(SANKO_VOICE_RULES,/Если прямо попросили подробно/);
 });
