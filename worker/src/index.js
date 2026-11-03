@@ -7,9 +7,10 @@ import {
 import { SANKO_CORE_RELATIONSHIPS } from "./sanko-core-relationships.js";
 import { canonLexical } from "./canon-store.js";
 import { adminFetch } from "./admin.js";
+import { extractUsage,recordUsage } from "./token-usage.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.5.0";
+const VERSION="sanko-worker-0.5.1";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -108,6 +109,8 @@ async function expireOld(env) {
  try {
   await env.GUARD_DB.prepare("DELETE FROM chat_turns WHERE asked_at<?").bind(cutoff).run();
   await env.GUARD_DB.prepare("DELETE FROM chat_admissions WHERE created_at<?")
+    .bind(Math.floor(Date.now()/1000)-95*86400).run();
+  await env.GUARD_DB.prepare("DELETE FROM token_usage WHERE attempted_at<?")
     .bind(Math.floor(Date.now()/1000)-95*86400).run();
  }catch(err){console.warn("Sanko cleanup failed",err?.name);}
 }
@@ -300,21 +303,22 @@ async function geminiAttempt(env,model,timeout,system,contents) {
    signal:AbortSignal.timeout(timeout)
   });
   const data=await response.json().catch(()=>null);
+  const usage=extractUsage(data);
   if(!response.ok){
    const failure=classifyProviderError(response.status,data);
    if(response.status===429)modelCooldowns.set(model+"|"+String(env.GEMINI_API_KEY),{until:Date.now()+
     (failure.kind==="provider_quota"?300000:30000),kind:failure.kind});
    console.warn("Sanko Gemini unavailable",JSON.stringify({model,status:response.status,kind:failure.kind}));
-   return {ok:false,...failure};
+   return {ok:false,...failure,usage};
   }
   const candidate=data?.candidates?.[0],reason=String(candidate?.finishReason||data?.promptFeedback?.blockReason||"");
   if(["SAFETY","PROHIBITED_CONTENT","BLOCKLIST","SPII","RECITATION","MODEL_ARMOR"].includes(reason))
-   return {ok:false,retryable:false,kind:"response_blocked"};
+   return {ok:false,retryable:false,kind:"response_blocked",usage};
   if(["MAX_TOKENS","CONTINUATION"].includes(reason))
-   return {ok:false,retryable:true,kind:"provider_busy"};
+   return {ok:false,retryable:true,kind:"provider_busy",usage};
   const answer=candidate?.content?.parts?.filter(x=>typeof x.text==="string"&&!x.thought)
    .map(x=>x.text).join("").trim();
-  return answer?{ok:true,reply:answer}:{ok:false,retryable:true,kind:"provider_busy"};
+  return answer?{ok:true,reply:answer,usage}:{ok:false,retryable:true,kind:"provider_busy",usage};
  }catch(error){
   console.warn("Sanko Gemini request interrupted",error?.name||"unknown");
   return {ok:false,retryable:true,kind:"provider_busy"};
@@ -324,6 +328,7 @@ async function answerWithGemini(env,system,history,question) {
  const contents=history.map(x=>({role:x.role==="model"?"model":"user",parts:[{text:x.text}]}));
  contents.push({role:"user",parts:[{text:question}]});
  let fallback=false,lastKind="provider_busy",anyQuota=false;
+ const attempts=[];
  for(const [model,timeout] of modelList(env)) {
   const cooldown=modelCooldowns.get(model+"|"+String(env.GEMINI_API_KEY));
   if(cooldown?.until>Date.now()){
@@ -331,13 +336,15 @@ async function answerWithGemini(env,system,history,question) {
    fallback=true;continue;
   }
   const result=await geminiAttempt(env,model,timeout,system,contents);
-  if(result.ok)return {ok:true,reply:result.reply,model,fallbackUsed:fallback};
+  attempts.push({model,status:result.ok?"answered":result.kind||"provider_busy",
+   attemptedAt:Math.floor(Date.now()/1000),usage:result.usage||null});
+  if(result.ok)return {ok:true,reply:result.reply,model,fallbackUsed:fallback,attempts};
   lastKind=result.kind||"provider_busy";
   if(lastKind==="provider_quota")anyQuota=true;
-  if(!result.retryable)return {ok:false,reason:lastKind};
+  if(!result.retryable)return {ok:false,reason:lastKind,attempts};
   fallback=true;
  }
- return {ok:false,reason:anyQuota?"provider_quota":lastKind};
+ return {ok:false,reason:anyQuota?"provider_quota":lastKind,attempts};
 }
 async function verifyVk(launch,env) {
  if(!env.VK_APP_SECRET||!env.VK_APP_ID||typeof launch!=="string"||launch.length>3000)return null;
@@ -400,6 +407,7 @@ async function chat(req,env,origin,ctx) {
  const diary=await loadPublishedDiary(env,scope,question);
  const system=systemText(runtime,scope,hits,today,diary);
  const generated=await answerWithGemini(env,system,history,question);
+ await recordUsage(env,admission.id,generated.attempts);
  if(!generated.ok) {
   await storeTurn(env,id,admission.id,question,"","","error");
   return respond(publicChatError(generated.reason,{conversationId:id}),generated.reason==="response_blocked"?422:503,origin,env);

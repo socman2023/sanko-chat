@@ -5,7 +5,7 @@ import { dayInMoscow } from "../src/lib.js";
 
 const URL="https://sanko-chat-api.example/api/chat";
 function envStub(opts={}) {
- const observed={queries:[],gemini:[],insertions:[],kv:[]};
+ const observed={queries:[],gemini:[],insertions:[],kv:[],usageInserts:[]};
  const env={
   GEMINI_API_KEY:"FAKE_TEST_KEY_NOT_REAL_"+crypto.randomUUID(),
   IP_HASH_SECRET:"FAKE_PEPPER_NOT_REAL",
@@ -37,7 +37,7 @@ function envStub(opts={}) {
       }
       return null;
     },
-    async run(){return {success:true};}
+    async run(){if(sql.includes("INSERT INTO token_usage"))observed.usageInserts.push({sql,values:this.params});return {success:true};}
   })}
  };
  if(opts.diary) {
@@ -408,5 +408,70 @@ test("model-specific quota cooldown avoids immediate repeated Gemini calls",asyn
   assert.equal(response.status,503);
   assert.equal((await response.json()).error,"provider_quota");
   assert.equal(calls,4,"Do not contact any model during short local cooldown");
+ }finally{globalThis.fetch=original;}
+});
+
+
+test("Gemini usageMetadata is recorded for each actual attempt including fallback",async()=>{
+ const {env,observed}=envStub();
+ const original=globalThis.fetch,models=[];
+ globalThis.fetch=async url=>{
+  models.push(String(url).split("/models/")[1].split(":")[0]);
+  if(models.length===1)return new Response(JSON.stringify({
+   error:{status:"RESOURCE_EXHAUSTED",message:"test"}}),{status:429});
+  return new Response(JSON.stringify({
+   candidates:[{finishReason:"STOP",content:{parts:[{text:"Здрав будь!"}]}}],
+   usageMetadata:{promptTokenCount:4500,candidatesTokenCount:22,thoughtsTokenCount:3,
+    cachedContentTokenCount:200,totalTokenCount:4525}
+  }),{status:200});
+ };
+ try{
+  const r=await worker.fetch(req("Расскажи о себе"),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal(observed.usageInserts.length,2);
+  assert.deepEqual(models,["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
+  const a=observed.usageInserts[0].values,b=observed.usageInserts[1].values;
+  assert.equal(a[3],"gemini-3.5-flash-lite");
+  assert.equal(a[4],"provider_quota");
+  assert.equal(a[9],null,"Missing metadata must not be counted as zero");
+  assert.equal(b[3],"gemini-3.1-flash-lite");
+  assert.equal(b[4],"answered");
+  assert.deepEqual(b.slice(5),[4500,22,3,200,4525]);
+  assert(!JSON.stringify(observed.usageInserts).includes("Расскажи о себе"),
+   "Usage log stores no conversation texts");
+ }finally{globalThis.fetch=original;}
+});
+
+test("Gemini safety-blocked attempt accounts for available usage",async()=>{
+ const {env,observed}=envStub();
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({
+  candidates:[{finishReason:"SAFETY",content:{parts:[]}}],
+  usageMetadata:{promptTokenCount:11,totalTokenCount:11}
+ }),{status:200});
+ try{
+  const r=await worker.fetch(req("Вопрос"),env,ctx);
+  assert.equal(r.status,422);
+  assert.equal(observed.usageInserts.length,1);
+  assert.equal(observed.usageInserts[0].values[4],"response_blocked");
+  assert.equal(observed.usageInserts[0].values[9],11);
+ }finally{globalThis.fetch=original;}
+});
+
+test("missing token_usage table does not break character chat",async()=>{
+ const {env}=envStub();
+ const old=env.GUARD_DB.prepare,original=globalThis.fetch;
+ env.GUARD_DB.prepare=sql=>{
+  if(sql.includes("INSERT INTO token_usage"))throw Error("no such table");
+  return old(sql);
+ };
+ globalThis.fetch=async()=>new Response(JSON.stringify({
+  candidates:[{finishReason:"STOP",content:{parts:[{text:"Здрав будь!"}]}}],
+  usageMetadata:{promptTokenCount:9,totalTokenCount:12}
+ }),{status:200});
+ try{
+  const r=await worker.fetch(req("Привет"),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal((await r.json()).reply,"Здрав будь!");
  }finally{globalThis.fetch=original;}
 });
