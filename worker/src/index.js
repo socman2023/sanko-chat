@@ -13,7 +13,7 @@ import { needsVoiceRepair,makeVoiceRepairPrompt } from "./sanko-voice-check.js";
 import { guardSankoReply } from "./reply-guard.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.5.7";
+const VERSION="sanko-worker-0.5.8";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -390,9 +390,13 @@ async function refineSankoVoice(env,generated,question,history,diary,hits) {
   ...(hits||[]).slice(0,3).map(x=>String(x.text||"").slice(0,550))
  ].join("\n").slice(0,4700);
  const prompt=makeVoiceRepairPrompt(question,generated.reply,history,evidence);
- const result=await geminiAttempt(env,generated.model,12000,prompt.system,
+ // The stronger Flash editor is also a Free Tier model. Do not invoke models
+ // outside the already configured model list. At most ONE extra call.
+ const configured=modelList(env).map(x=>x[0]);
+ const editorModel=configured.includes("gemini-3.6-flash")?"gemini-3.6-flash":generated.model;
+ const result=await geminiAttempt(env,editorModel,18000,prompt.system,
   [{role:"user",parts:[{text:prompt.request}]}],1536);
- generated.attempts.push({model:generated.model,
+ generated.attempts.push({model:editorModel,
   status:result.ok?"voice_rewrite_answered":"voice_rewrite_"+(result.kind||"unavailable"),
   attemptedAt:Math.floor(Date.now()/1000),usage:result.usage||null});
  if(!result.ok)return generated;
