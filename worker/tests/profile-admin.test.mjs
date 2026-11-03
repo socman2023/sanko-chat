@@ -50,7 +50,7 @@ test("private profile activation has a reversible backup and no writes to Oleshk
  const {env,map,events}=mock();
  const prior=map.get("sanko:profile:v1");
  const activate=await activateProfile(env,{profile:PROFILE});
- assert.equal(activate.status,200,await activate.text());
+ assert.equal(activate.status,200);
  const out=await activate.json();
  assert.equal(out.chars,PROFILE.length);
  assert.equal(out.sha256.length,64);
