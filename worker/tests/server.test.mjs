@@ -390,3 +390,23 @@ test("non-JSON upstream Gemini outage never leaks technical information to visit
   assert(!body.reply.includes("Cloudflare"));
  }finally{globalThis.fetch=original;}
 });
+
+test("model-specific quota cooldown avoids immediate repeated Gemini calls",async()=>{
+ const {env}=envStub();
+ let calls=0;
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>{
+  calls++;
+  return new Response(JSON.stringify({error:{status:"RESOURCE_EXHAUSTED"}}),{status:429});
+ };
+ try{
+  let response=await worker.fetch(req("Расскажи про богов"),env,ctx);
+  assert.equal(response.status,503);
+  assert.equal((await response.json()).error,"provider_quota");
+  assert.equal(calls,4);
+  response=await worker.fetch(req("Расскажи про других богов"),env,ctx);
+  assert.equal(response.status,503);
+  assert.equal((await response.json()).error,"provider_quota");
+  assert.equal(calls,4,"Do not contact any model during short local cooldown");
+ }finally{globalThis.fetch=original;}
+});
