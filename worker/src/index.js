@@ -7,8 +7,9 @@ import {
 import { SANKO_CORE_RELATIONSHIPS } from "./sanko-core-relationships.js";
 import { canonLexical } from "./canon-store.js";
 import { adminFetch } from "./admin.js";
+import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.4.1";
+const VERSION="sanko-worker-0.5.0";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -286,38 +287,57 @@ function modelList(env) {
    .filter(x=>/^[a-z0-9][a-z0-9._-]{2,90}$/.test(x)).slice(0,4);
  return names.length?names.map((name,i)=>[name,MODEL_ORDER[i]?.[1]||12000]):MODEL_ORDER;
 }
+// Best-effort per-isolate cooldown for models that recently returned 429.
+// This does NOT claim to enforce a global quota or know its reset time.
+const modelCooldowns=new Map();
 async function geminiAttempt(env,model,timeout,system,contents) {
  try {
   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",{
    method:"POST",
    headers:{"Content-Type":"application/json","x-goog-api-key":String(env.GEMINI_API_KEY)},
-   body:JSON.stringify({
-    systemInstruction:{parts:[{text:system}]},contents,
-    generationConfig:{maxOutputTokens:4096,thinkingConfig:{thinkingLevel:"low"}}
-   }),
+   body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,
+    generationConfig:{maxOutputTokens:4096,thinkingConfig:{thinkingLevel:"low"}}}),
    signal:AbortSignal.timeout(timeout)
   });
   const data=await response.json().catch(()=>null);
-  if(!response.ok)return {ok:false,retryable:[429,500,502,503,504].includes(response.status)};
+  if(!response.ok){
+   const failure=classifyProviderError(response.status,data);
+   if(response.status===429)modelCooldowns.set(model,{until:Date.now()+
+    (failure.kind==="provider_quota"?300000:30000),kind:failure.kind});
+   console.warn("Sanko Gemini unavailable",JSON.stringify({model,status:response.status,kind:failure.kind}));
+   return {ok:false,...failure};
+  }
   const candidate=data?.candidates?.[0],reason=String(candidate?.finishReason||data?.promptFeedback?.blockReason||"");
-  if(["SAFETY","PROHIBITED_CONTENT","BLOCKLIST","SPII"].includes(reason))return {ok:false,retryable:false,blocked:true};
-  if(["MAX_TOKENS","CONTINUATION"].includes(reason))return {ok:false,retryable:true};
+  if(["SAFETY","PROHIBITED_CONTENT","BLOCKLIST","SPII","RECITATION","MODEL_ARMOR"].includes(reason))
+   return {ok:false,retryable:false,kind:"response_blocked"};
+  if(["MAX_TOKENS","CONTINUATION"].includes(reason))
+   return {ok:false,retryable:true,kind:"provider_busy"};
   const answer=candidate?.content?.parts?.filter(x=>typeof x.text==="string"&&!x.thought)
-    .map(x=>x.text).join("").trim();
-  return answer?{ok:true,reply:answer}:{ok:false,retryable:true};
- }catch{return {ok:false,retryable:true};}
+   .map(x=>x.text).join("").trim();
+  return answer?{ok:true,reply:answer}:{ok:false,retryable:true,kind:"provider_busy"};
+ }catch(error){
+  console.warn("Sanko Gemini request interrupted",error?.name||"unknown");
+  return {ok:false,retryable:true,kind:"provider_busy"};
+ }
 }
 async function answerWithGemini(env,system,history,question) {
  const contents=history.map(x=>({role:x.role==="model"?"model":"user",parts:[{text:x.text}]}));
  contents.push({role:"user",parts:[{text:question}]});
- let fallback=false;
+ let fallback=false,lastKind="provider_busy",anyQuota=false;
  for(const [model,timeout] of modelList(env)) {
+  const cooldown=modelCooldowns.get(model);
+  if(cooldown?.until>Date.now()){
+   if(cooldown.kind==="provider_quota")anyQuota=true;
+   fallback=true;continue;
+  }
   const result=await geminiAttempt(env,model,timeout,system,contents);
   if(result.ok)return {ok:true,reply:result.reply,model,fallbackUsed:fallback};
-  if(!result.retryable)return {ok:false,reason:result.blocked?"blocked":"unavailable"};
+  lastKind=result.kind||"provider_busy";
+  if(lastKind==="provider_quota")anyQuota=true;
+  if(!result.retryable)return {ok:false,reason:lastKind};
   fallback=true;
  }
- return {ok:false,reason:"unavailable"};
+ return {ok:false,reason:anyQuota?"provider_quota":lastKind};
 }
 async function verifyVk(launch,env) {
  if(!env.VK_APP_SECRET||!env.VK_APP_ID||typeof launch!=="string"||launch.length>3000)return null;
@@ -347,14 +367,14 @@ async function session(req,env,origin) {
  return respond({role:"stranger",verified:!!verified,firstName:name},200,origin,env);
 }
 async function chat(req,env,origin,ctx) {
- if(!ready(env))return respond({error:"configuration_incomplete"},503,origin,env);
+ if(!ready(env))return respond(publicChatError("service_unavailable"),503,origin,env);
  const body=await bodyJson(req),question=shorten(body?.message,CHAT_MAX_CHARS+1);
  if(!question||question.length>CHAT_MAX_CHARS)return respond({error:"invalid_message"},400,origin,env);
  const today=dayInMoscow(),scope=dateIntent(question,today),history=safeHistory(body?.history);
  const id=cleanConversationId(body?.conversationId);
  let runtime;
  try{runtime=await canonicalContext(env,scope);}catch{
-  return respond({error:"character_profile_unavailable"},503,origin,env);
+  return respond(publicChatError("service_unavailable"),503,origin,env);
  }
  const admission=await reserveAdmission(env,req,Date.now());
  if(!admission.ok) {
@@ -382,7 +402,7 @@ async function chat(req,env,origin,ctx) {
  const generated=await answerWithGemini(env,system,history,question);
  if(!generated.ok) {
   await storeTurn(env,id,admission.id,question,"","","error");
-  return respond({error:generated.reason,reply:"Что-то связь сегодня не ладится. Попробуй попозже.",conversationId:id},503,origin,env);
+  return respond(publicChatError(generated.reason,{conversationId:id}),generated.reason==="response_blocked"?422:503,origin,env);
  }
  await storeTurn(env,id,admission.id,question,generated.reply,generated.model,"answered");
  if(Math.random()<0.01)ctx.waitUntil(expireOld(env));
@@ -413,8 +433,7 @@ export default {
    if(["invalid_json","body_too_large"].includes(err?.message))
     return respond({error:err.message},400,origin,env);
    console.error("Sanko Worker request failed",err?.name);
-   return respond({error:err?.message==="quota_unavailable"?"quota_unavailable":"temporary_unavailable"},
-     503,origin,env);
+   return respond(publicChatError("service_unavailable"),503,origin,env);
   }
  },
  async scheduled(_event,env,ctx) {
