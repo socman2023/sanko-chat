@@ -35,6 +35,7 @@
   let conversation = [], conversationId = '', greetingId = 0, focusDate = '';
   let limitUntil = 0, busy = false, visitorRole = 'stranger', visitorName = '';
   let warnedPreview = false;
+  let unlockTimer = 0;
   let vkFirstName = '', vkFirstNameUserId = 0;
   const FAILURE_NOTICE = 'Что-то связь не идёт. Загляни попозже, ладно?';
 
@@ -115,8 +116,8 @@
   }
   function render() {
     messages.replaceChildren();
-    if (!conversation.length) bubble('model', greeting());
-    else conversation.forEach(m => bubble(m.role, m.text));
+    if (!conversation.some(m => m.role === 'user' || m.role === 'model')) bubble('model', greeting());
+    conversation.forEach(m => bubble(m.role, m.text));
   }
   function resize() {
     input.style.height = 'auto';
@@ -128,6 +129,20 @@
     input.disabled = value;
     send.disabled = value;
   }
+  function applyLimitLock() {
+    if (unlockTimer) clearTimeout(unlockTimer);
+    unlockTimer = 0;
+    if (busy) return;
+    const remaining = limitUntil - Date.now();
+    if (remaining > 0) {
+      input.disabled = true; send.disabled = true;
+      unlockTimer = setTimeout(applyLimitLock, Math.min(60000,remaining+100));
+    } else {
+      if (limitUntil) { limitUntil = 0; save(); }
+      input.disabled = false; send.disabled = false;
+    }
+  }
+  window.addEventListener('focus', applyLimitLock);
   function signedVkLaunch() {
     const qs = new URLSearchParams(window.location.search);
     return qs.has('vk_user_id') && qs.has('vk_app_id') && qs.has('sign') ? window.location.search : '';
@@ -244,8 +259,8 @@
     } finally {
       clearTimeout(t);
       setBusy(false);
-      if (limitUntil > Date.now()) { input.disabled = true; send.disabled = true; }
-      else input.focus();
+      applyLimitLock();
+      if (!input.disabled) input.focus();
     }
   });
   input.addEventListener('input', resize);
@@ -261,7 +276,7 @@
     greetingId = chooseGreeting(greetingId);
     if (!PREVIEW) { try { localStorage.removeItem(STORAGE_KEY); } catch (_) {} }
     save(); error(''); input.value=''; render(); resize();
-    input.disabled = limitUntil > Date.now(); send.disabled = limitUntil > Date.now();
+    applyLimitLock();
     if (!input.disabled) input.focus();
   }
   newButton.addEventListener('click', () => {
@@ -281,9 +296,8 @@
     }
     if (!PREVIEW) await initVk();
     render(); resize(); save();
-    if (limitUntil > Date.now()) { input.disabled = true; send.disabled = true; }
-    else { input.disabled = false; send.disabled = false; }
+    applyLimitLock();
   }
   input.disabled = true; send.disabled = true;
-  start().catch(() => { render(); resize(); input.disabled = false; send.disabled = false; });
+  start().catch(() => { render(); resize(); applyLimitLock(); });
 })();
