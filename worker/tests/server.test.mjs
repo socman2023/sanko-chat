@@ -509,8 +509,9 @@ test("Sanko never presents the previous diary day as events of today after midni
   const prompt=observed.gemini[0];
   assert(prompt.includes("за сегодняшний день "+today+" в доступном дневнике НЕТ записей"));
   assert(prompt.includes("Самые новые доступные записи датированы "+yesterday));
-  assert(prompt.includes("НЕ называй их событиями сегодняшнего дня"));
+  assert(prompt.includes("НЕ называй старые события событиями сегодняшнего дня"));
   assert(prompt.includes("Вчера произошло новое событие"));
+  assert(prompt.includes("ЯВНО назвав его дату"),"Last-known activity must be dated");
  }finally{globalThis.fetch=old;}
 });
 
