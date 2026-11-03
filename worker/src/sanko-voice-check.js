@@ -4,7 +4,7 @@
 const characteristic=/(?:^|[^\p{L}])(?:шо|як|якой|тока|токмо|энто|энтот|енто|ентот|тута|тама|куды|хто|ежли|тож|али|нема|хошь|надоть|чую|чаю|знамо|пошто|тады|вона|мя|мене|хде|завсегда|давеча|нынче|драпали|слышь|покуда)(?=$|[^\p{L}])/iu;
 const unnatural=/(?:^|[^\p{L}])(?:чинуш|чинот)[\p{L}]*(?=$|[^\p{L}])|ден[её]к\s+выдался|сполохом\s+(?:им\s+)?глаза|за\s+энту\s+дату|по\s+доступным\s+записям/iu;
 const wordCount=s=>String(s||"").trim().split(/\s+/u).filter(Boolean).length;
-const unacceptable=/\b(?:далебени|чинота|чинуша|чинушами)\b|сполохом\s+(?:им\s+)?глаза|сполохом\s+глаза\s+стражник\p{L}*/iu;
+const unacceptable=/(?:^|[^\p{L}])(?:далебени|чинота|чинуша|чинушами)(?=$|[^\p{L}])|сполохом\s+(?:им\s+)?глаза|сполохом\s+глаза\s+стражник\p{L}*/iu;
 export function unsafeVoiceRewrite(reply) { return unacceptable.test(String(reply||"")); }
 
 export function needsVoiceRepair(answer) {
