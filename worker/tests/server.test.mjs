@@ -625,6 +625,7 @@ test("plain generic Sanko answer gets ONE fact-constrained voice rewrite with bo
   assert.equal(observed.usageInserts[1].values[4],"voice_rewrite_answered");
   assert.equal(observed.usageInserts[1].values[3],"gemini-3.6-flash");
   assert.equal(requests[1].generationConfig.maxOutputTokens,1536);
+  assert.equal(requests[1].generationConfig.temperature,0.15);
   assert.match(requests[1].contents[0].parts[0].text,/Купец навел городскую стражу/);
  }finally{globalThis.fetch=prev;}
 });
