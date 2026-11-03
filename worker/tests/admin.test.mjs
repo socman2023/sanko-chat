@@ -14,6 +14,7 @@ function createEnv() {
    const q={sql,values:[],bind(...values){this.values=values;return this;},
     async first(){
      calls.push({sql:this.sql,values:this.values});
+     if(sql.includes("token_usage"))return {calls:2,meteredCalls:1,unknownCalls:1,total:4525,prompt:4500,candidate:22,thoughts:3,cached:200};
      if(sql.includes("COUNT(DISTINCT conversation_id)"))return {n:1};
      if(sql.includes("COUNT(DISTINCT t.conversation_id)"))return {n:1};
      if(sql.includes("chat_admissions WHERE month"))return {n:7};
@@ -22,6 +23,8 @@ function createEnv() {
     },
     async all(){
      calls.push({sql:this.sql,values:this.values});
+     if(sql.includes("token_usage")&&sql.includes("GROUP BY day"))return {results:[]};
+     if(sql.includes("token_usage")&&sql.includes("GROUP BY model"))return {results:[{model:"gemini-3.5-flash-lite",calls:2,meteredCalls:1,unknownCalls:1,total:4525,prompt:4500,candidate:22,thoughts:3,cached:200}]};
      if(sql.includes("GROUP BY day"))return {results:[{day:"2026-11-02",n:5,ips:3}]};
      if(sql.includes("GROUP BY model"))return {results:[{model:"gemini-3.5-flash-lite",n:4}]};
      if(sql.includes("GROUP BY status"))return {results:[{status:"answered",n:4}]};
@@ -93,6 +96,10 @@ test("admin stats show independent Sanko admissions, never client hash values",a
  assert.equal(body.conversations30d,1);
  assert.equal(body.daily.length,30);
  assert.equal(body.models[0].model,"gemini-3.5-flash-lite");
+ assert.equal(body.tokenUsage.status,"ready");
+ assert.equal(body.tokenUsage.month.total,4525);
+ assert.equal(body.tokenUsage.month.unknownCalls,1);
+ assert.equal(body.tokenUsage.models[0].model,"gemini-3.5-flash-lite");
  assert(!JSON.stringify(body).includes("client_hash"));
  assert(calls.every(c=>!c.sql.includes("oleshka_vk_diary")));
  assert(calls.every(c=>!c.sql.includes("DIARY_DB")));
