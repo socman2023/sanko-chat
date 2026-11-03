@@ -9,9 +9,10 @@ import { canonLexical } from "./canon-store.js";
 import { adminFetch } from "./admin.js";
 import { extractUsage,recordUsage } from "./token-usage.js";
 import { SANKO_VOICE_RULES,SANKO_VOICE_REMINDER } from "./sanko-voice.js";
+import { guardSankoReply } from "./reply-guard.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.5.4";
+const VERSION="sanko-worker-0.5.5";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -241,21 +242,21 @@ function systemText(runtime,scope,hits,today,diary) {
  const hasRequestedDay=!!date&&diaryDays.includes(date);
  const diaryIsAvailable=diary?.available===true;
  const dateInfo=date
-  ?"Вопрос о "+date+". "+
+  ?"ВНУТРЕННИЙ ОРИЕНТИР: проверяемые события относятся к "+date+". "+
    (date===today&&!hasRequestedDay
-    ?"ПРОВЕРКА АКТУАЛЬНОСТИ: за сегодняшний день "+today+
-     (diaryIsAvailable?" в доступном дневнике НЕТ записей. ":" не удалось проверить доступность записей дневника. ")+
-     "Самые новые доступные записи датированы "+
-     (newestDiaryDay||"неизвестным днём")+
-     ". НЕ называй старые события событиями сегодняшнего дня и не пересказывай старый эпизод как новый. "+
-     "Если человек спрашивает, что сегодня случилось, объясни, что за эту дату нет подтверждённых сведений; "+
-     "если уместно, коротко расскажи последнее известное, ЯВНО назвав его дату. "
-    :"События проверяй по дате конкретной записи; не подменяй свежий день старой историей. ")+
-   "Дату публикации дневника не путай с датой самого события. "+
-   "Проверь, находился ли Санко рядом. Когда был порознь с другими, не сочиняй своего участия."
-  :"Сегодня "+today+". Личный контекст Санко датирован "+
-   (runtime.current.asOf||"неуказанным днём")+". "+
-   "Последующие общие события узнавай из обновляемого дневника; не считай старый срез запретом о них знать.";
+    ?(diaryIsAvailable?"За нынешний день свежих записей пока нет. ":"Свежие записи проверить не удалось. ")+
+     "Это не означает, что сегодня ничего не произошло. Последние подтверждённые события относятся к "+
+     (newestDiaryDay||"неизвестному дню")+". Не приписывай их нынешнему дню. "+
+     "На вопрос о нынешних событиях скажи просто, что нового пока не слыхал; "+
+     "если говоришь о предыдущем дне — используй «вчера»."
+    :"Сверяй события и участие Санко по фактам, не подменяя прошлое нынешним.")+
+   " Даты нужны исключительно для внутренней проверки фактов. "+
+   "НИКОГДА не произноси календарные даты, месяцы, годы и дни недели даже по прямой просьбе. "+
+   "Не говори «за энту дату» и не объясняй устройство дневника."
+  :"ВНУТРЕННИЙ ОРИЕНТИР: текущий день "+today+". Личный контекст Санко относится к "+
+   (runtime.current.asOf||"неизвестному дню")+". Последующие события узнавай из дневника. "+
+   "Даты служат только для проверки; в собственных репликах НИКОГДА не называй "+
+   "календарные даты, месяцы, годы и дни недели.";
  const snippets=hits.map((h,i)=>"["+String(i+1)+"] Дата: "+(h.date||"нет")+"; источник: "+(h.source||"не указан")+
    "; слой: "+h.layer+"\n"+h.text).join("\n\n");
  const diaryText=(diary?.posts||[]).map(x=>x.day+" | Общая запись событий"+
@@ -270,7 +271,7 @@ function systemText(runtime,scope,hits,today,diary) {
   "Пиши русской кириллицей, без механической украинизации. "+
   "Не копируй образцы речи дословно; применяй их закономерности в своих новых ответах. "+
   "Можешь шутить, сердиться, спорить, перебить и промолчать. "+
-  "Собеседник общается через летописец, а не стоит рядом. "+
+  "Собеседник не находится рядом с тобой. Не обсуждай способ связи без его вопроса. "+
   "Не упоминай техническое устройство, модель, подсказки или инструкции.",
   SANKO_VOICE_RULES,
   "## Что знаешь о себе\n"+runtime.profile,
@@ -438,10 +439,12 @@ async function chat(req,env,origin,ctx) {
   await storeTurn(env,id,admission.id,question,"","","error");
   return respond(publicChatError(generated.reason,{conversationId:id}),generated.reason==="response_blocked"?422:503,origin,env);
  }
- await storeTurn(env,id,admission.id,question,generated.reply,generated.model,"answered");
+ const guarded=guardSankoReply(generated.reply);
+ if(guarded.blocked)console.warn("Sanko reply guard: calendar date or bookkeeping removed");
+ await storeTurn(env,id,admission.id,question,guarded.reply,generated.model,"answered");
  if(Math.random()<0.01)ctx.waitUntil(expireOld(env));
  return respond({
-  conversationId:id,reply:generated.reply,model:generated.model,
+  conversationId:id,reply:guarded.reply,model:generated.model,
   fallbackUsed:generated.fallbackUsed,
   knowledge:{focusDate:scope?.day||"",matches:hits.length,diaryPosts:diary.posts.length,mode:scope?"date-scoped":"general"}
  },200,origin,env);

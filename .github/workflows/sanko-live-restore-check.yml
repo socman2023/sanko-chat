@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
-      - name: Wait for production Worker 0.5.4 and inspect diary freshness
+      - name: Wait for production Worker 0.5.5 and inspect diary freshness
         shell: bash
         env:
           LIVE_HEALTH: https://sanko-chat-api.boysinger2008.workers.dev/health
@@ -18,7 +18,7 @@ jobs:
           set -eu
           for attempt in $(seq 1 24); do
             body="$(curl -fsS --max-time 10 "$LIVE_HEALTH" || true)"
-            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.5.4" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.5.5" and .diarySync.status=="ok"' >/dev/null 2>&1; then
               printf '%s' "$body" | jq '{version,configured,diaryConnected,diarySync}'
               echo "LIVE_HEALTH_OK=1" >> "$GITHUB_ENV"
               exit 0
@@ -26,7 +26,7 @@ jobs:
             echo "Live Worker version / diary not ready (attempt $attempt of 24)."
             sleep 10
           done
-          echo "Unable to independently confirm current Worker 0.5.4 with diary access" >&2
+          echo "Unable to independently confirm current Worker 0.5.5 with diary access" >&2
           exit 1
       - name: One controlled Sanko dialogue smoke test
         if: env.LIVE_HEALTH_OK == '1'
@@ -81,6 +81,10 @@ jobs:
           const spoken=/(^|[^\p{L}])(?:шо|як|якой|тока|токмо|энто|энтот|ентова|ентим|энтим|ежли|тута|тама|хто|куды|шоб|али|нема|хошь|тож|тады|хде|надоть)(?=$|[^\p{L}])/iu;
           if(!spoken.test(data.reply)) {
            console.error("Sanko's today reply lost canonical dialect");process.exit(1);
+          }
+          if(/(?:19|20)\d\d|\d{1,2}[.\/-]\d{1,2}|январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр|за энту дату|доступн.{0,15}летопис/iu.test(data.reply)){
+           console.error("Spoken reply leaked calendar dates or bookkeeping");
+           process.exit(1);
           }
           if(data.knowledge?.focusDate!==todayMoscow) {
            console.error("Today date parser failed");process.exit(1);

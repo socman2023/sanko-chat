@@ -99,15 +99,15 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   const instructions=observed.gemini[0].system;
   assert.match(instructions,/одна или две короткие фразы/);
   assert.match(instructions,/примерно 8–30 слов/);
-  assert.match(instructions,/его говор слышен В ОБЫЧНЫХ разговорах/i);
-  assert.match(instructions,/В собственных фразах обычно предпочитай естественные для Санко формы/);
+  assert.match(instructions,/Говор у тебя свой, привычный с детства/);
+  assert.match(instructions,/Твои привычные живые словечки и формы/);
   for(const word of ["шо","як","якой","токмо","тока","энто","энтот","ежли","тута","хто","куды"])
    assert(instructions.includes(word),"Missing canon/author-approved form: "+word);
   assert.match(instructions,/Ты шо, дырку протереть хошь/);
   assert.match(instructions,/Про Тариба-то писать будете\? Як живет, шо творит/);
   assert(!instructions.includes("Слова «шо», «анэ», «зело» допустимы в подходящей ситуации, иногда в шутку"));
   assert(!instructions.includes("Не перебарщивай с говором"));
-  assert.match(instructions,/Голос Санко — обязательная постоянная манера речи/);
+  assert.match(instructions,/Как разговаривает Санко/);
   assert.match(instructions,/Обычно ты был рядом с Олешкой/);
   assert.match(instructions,/Не сообщай выдуманные текущие события/);
   assert(!instructions.includes("Олешка написал в дневнике: перелетели Стену."));
@@ -516,11 +516,11 @@ test("Sanko never presents the previous diary day as events of today after midni
   assert(entries.some(x=>x.sql.includes("published_day_msk<?")),
    "When today's diary is empty, retrieve the latest dated entry");
   const prompt=observed.gemini[0];
-  assert(prompt.includes("за сегодняшний день "+today+" в доступном дневнике НЕТ записей"));
-  assert(prompt.includes("Самые новые доступные записи датированы "+yesterday));
-  assert(prompt.includes("НЕ называй старые события событиями сегодняшнего дня"));
+  assert(prompt.includes("ВНУТРЕННИЙ ОРИЕНТИР"));
+  assert(prompt.includes("Последние подтверждённые события относятся к "+yesterday));
+  assert(prompt.includes("Не приписывай их нынешнему дню"));
   assert(prompt.includes("Вчера произошло новое событие"));
-  assert(prompt.includes("ЯВНО назвав его дату"),"Last-known activity must be dated");
+  assert(!prompt.includes("ЯВНО назвав его дату"));
  }finally{globalThis.fetch=old;}
 });
 
@@ -549,7 +549,7 @@ test("a verified current-day diary entry remains first priority",async()=>{
   assert.equal(result.status,200);
   const prompt=observed.gemini[0];
   assert(prompt.includes("Сегодня утром нашли письмо для Румана."));
-  assert(!prompt.includes("в доступном дневнике НЕТ записей"));
+  assert(!prompt.includes("За нынешний день свежих записей пока нет"));
  }finally{globalThis.fetch=old;}
 });
 
@@ -569,10 +569,29 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(system.includes("1–2 короткие фразы"));
   assert(system.includes("Если спрашивают подробно — тогда расскажи подробнее"));
   assert(system.includes("Не повторяй всю последовательность приключений"));
-  assert(system.includes("Голос Санко — обязательная постоянная манера речи"));
-  assert(system.includes("Говори как Санко"));
-  assert(system.includes("ПРОВЕРЬ СВОЙ ОТВЕТ ПЕРЕД ОТПРАВКОЙ"));
-  assert(system.includes("«шо»"));
+  assert(system.includes("Как разговаривает Санко"));
+  assert(system.includes("Ты Санко, славонский мальчишка"));
+  assert(system.includes("Перед ответом проверь"));
+  assert(system.includes("«энто» или «шо»"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
  }finally{globalThis.fetch=old;}
+});
+
+test("dates or admin phrases returned by Gemini never reach Sanko visitor",async()=>{
+ const {env}=envStub();
+ const before=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({
+  candidates:[{finishReason:"STOP",content:{parts:[{
+   text:"За энту дату нема новостей. Последние события 4 ноября 2026."
+  }]}}]
+ }),{status:200});
+ try {
+  const result=await worker.fetch(req("Что сегодня было?"),env,ctx);
+  assert.equal(result.status,200);
+  const data=await result.json();
+  assert(!data.reply.includes("дату"));
+  assert(!data.reply.includes("ноября"));
+  assert(!data.reply.includes("2026"));
+  assert.match(data.reply,/Покуда/);
+ } finally {globalThis.fetch=before;}
 });
