@@ -7,7 +7,7 @@ const URL="https://sanko-chat-api.example/api/chat";
 function envStub(opts={}) {
  const observed={queries:[],gemini:[],insertions:[],kv:[]};
  const env={
-  GEMINI_API_KEY:"FAKE_TEST_KEY_NOT_REAL",
+  GEMINI_API_KEY:"FAKE_TEST_KEY_NOT_REAL_"+crypto.randomUUID(),
   IP_HASH_SECRET:"FAKE_PEPPER_NOT_REAL",
   AI:{run:async(_model,_body)=>({data:[Array(1024).fill(.001)]})},
   KNOWLEDGE:{query:async(_vector,opts)=>{
