@@ -53,8 +53,8 @@ jobs:
            console.error("No current/latest diary supplied to Gemini");
            process.exit(1);
           }
-          const spoken=/(^|[^\\p{L}])(?:шо|як|якой|тока|токмо|энто|энтот|ентова|ентим|энтим|ежли|тута|тама|хто|куды|шоб|али|нема|хошь|тож|тады|хде|надоть)(?=$|[^\\p{L}])/iu;
-          const words=data.reply.trim().split(/\\s+/u).filter(Boolean).length;
+          const spoken=/(^|[^\p{L}])(?:шо|як|якой|тока|токмо|энто|энтот|ентова|ентим|энтим|ежли|тута|тама|хто|куды|шоб|али|нема|хошь|тож|тады|хде|надоть)(?=$|[^\p{L}])/iu;
+          const words=data.reply.trim().split(/\s+/u).filter(Boolean).length;
           console.log("Voice check on latest events:",{words,hasDialectedWord:spoken.test(data.reply)});
           if(!spoken.test(data.reply)){console.error("Sanko's latest-events reply lost his dialect");process.exit(1);}
           if(words>30){console.error("Sanko's latest-events reply is too long");process.exit(1);}
@@ -78,7 +78,7 @@ jobs:
           const words=data.reply.trim().split(/\s+/u).filter(Boolean).length;
           console.log("Default answer words:",words);
           if(words>30){console.error("Sanko exceeded 30-word default reply: "+words);process.exit(1);}
-          const spoken=/(^|[^\\p{L}])(?:шо|як|якой|тока|токмо|энто|энтот|ентова|ентим|энтим|ежли|тута|тама|хто|куды|шоб|али|нема|хошь|тож|тады|хде|надоть)(?=$|[^\\p{L}])/iu;
+          const spoken=/(^|[^\p{L}])(?:шо|як|якой|тока|токмо|энто|энтот|ентова|ентим|энтим|ежли|тута|тама|хто|куды|шоб|али|нема|хошь|тож|тады|хде|надоть)(?=$|[^\p{L}])/iu;
           if(!spoken.test(data.reply)) {
            console.error("Sanko's today reply lost canonical dialect");process.exit(1);
           }
