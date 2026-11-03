@@ -304,8 +304,8 @@ test("safety-blocked reply is not bypassed via fallback",async()=>{
  };
  try{
   const response=await worker.fetch(req("Как поживаешь?"),env,ctx);
-  assert.equal(response.status,503);
-  assert.equal((await response.json()).error,"blocked");
+  assert.equal(response.status,422);
+  assert.equal((await response.json()).error,"response_blocked");
   assert.equal(calls.length,1,"Do not hop models to bypass a safety block");
  }finally{globalThis.fetch=original;}
 });
@@ -349,5 +349,44 @@ test("late diary context preserves historical Sanko memory",async()=>{
   assert.equal(response.status,200);
   assert(observed.gemini[0].includes("КОНЕЦ ЗАПИСИ."));
   assert(observed.gemini[0].includes("ЯСМИН = ЛУНА"));
+ }finally{globalThis.fetch=original;}
+});
+
+test("provider quota is explained in Sanko's own words, never with Gemini details",async()=>{
+ const {env}=envStub();
+ const attempted=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async(url)=>{
+  attempted.push(String(url));
+  return new Response(JSON.stringify({error:{code:429,status:"RESOURCE_EXHAUSTED",
+   message:"QUOTA_EXCEEDED: API key limits",
+   details:[{"@type":"type.googleapis.com/google.rpc.QuotaFailure",violations:[{subject:"per_day"}]}]
+  }}),{status:429,headers:{"Content-Type":"application/json"}});
+ };
+ try{
+  const response=await worker.fetch(req("Расскажи про родных"),env,ctx);
+  assert.equal(response.status,503);
+  const body=await response.json();
+  assert.equal(body.error,"provider_quota");
+  assert.equal(typeof body.reply,"string");
+  assert(body.reply.includes("загляни"));
+  assert(!/quota|Gemini|API|RESOURCE|HTTP|429/i.test(body.reply));
+  assert.equal(attempted.length,4,"Backup models attempted only once each");
+  assert.equal(body.retryAt,undefined,"No invented provider reset time");
+ }finally{globalThis.fetch=original;}
+});
+
+test("non-JSON upstream Gemini outage never leaks technical information to visitor",async()=>{
+ const {env}=envStub();
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response("<html>Cloudflare 503 origin error</html>",
+  {status:503,headers:{"Content-Type":"text/html"}});
+ try{
+  const result=await worker.fetch(req("Как там дела?"),env,ctx);
+  assert.equal(result.status,503);
+  const body=await result.json();
+  assert.equal(body.error,"provider_busy");
+  assert(body.reply.includes("загляни"));
+  assert(!body.reply.includes("Cloudflare"));
  }finally{globalThis.fetch=original;}
 });
