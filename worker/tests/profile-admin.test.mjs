@@ -5,7 +5,7 @@ import {profileStatus,activateProfile,restoreProfile} from "../src/profile-admin
 import {ADMIN_SCRIPT} from "../src/admin-ui.js";
 const BASE="https://sanko-chat-api.boysinger2008.workers.dev";
 const TOKEN="test-admin-token-36-characters-long-never-use-real";
-const PROFILE="САНКО — ПЕРСОНАЛЬНЫЙ ПРОФИЛЬ v0.4.0 / ДЛЯ УТВЕРЖДЕНИЯ АВТОРОМ\n"+
+const PROFILE="САНКО — ПЕРСОНАЛЬНЫЙ ПРОФИЛЬ v0.4.0 / ДЕЙСТВУЮЩАЯ РЕДАКЦИЯ ПОСЛЕ УТВЕРЖДЕНИЯ\n"+
  "ОЛЕШКА ВЛАСТОЯР ЯСМИН / ЛУНА БРОМ ХАСИМ СИЛЬВАРИЯ РАТША ЯРКО РУМАН "+
  "ЭЛИНА АЙОАН КЛАСС АРБОРИСА КЛАСС СИМЕОНА КЛАСС БРИНА "+
  "Поднебесья источников\n"+"Санко — самостоятельный главный герой. ".repeat(400);
@@ -40,7 +40,7 @@ test("profile replacement requires valid token and same-origin admin request",as
 test("new personal profile does not accept incomplete or overlong canon",async()=>{
  const {env,map}=mock();
  for(const profile of ["Wrong personal profile","САНКО — ПЕРСОНАЛЬНЫЙ ПРОФИЛЬ v0.4.0\n"+("abc".repeat(5000)),
-   PROFILE+"t".repeat(40000)]){
+   PROFILE+"t".repeat(40000),\n   PROFILE.replace("ДЕЙСТВУЮЩАЯ РЕДАКЦИЯ ПОСЛЕ УТВЕРЖДЕНИЯ","ДЛЯ УТВЕРЖДЕНИЯ АВТОРОМ")]){
   const r=await activateProfile(env,{profile});
   assert.equal(r.status,400);
  }
