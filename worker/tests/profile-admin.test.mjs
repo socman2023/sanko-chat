@@ -40,7 +40,8 @@ test("profile replacement requires valid token and same-origin admin request",as
 test("new personal profile does not accept incomplete or overlong canon",async()=>{
  const {env,map}=mock();
  for(const profile of ["Wrong personal profile","САНКО — ПЕРСОНАЛЬНЫЙ ПРОФИЛЬ v0.4.0\n"+("abc".repeat(5000)),
-   PROFILE+"t".repeat(40000),\n   PROFILE.replace("ДЕЙСТВУЮЩАЯ РЕДАКЦИЯ ПОСЛЕ УТВЕРЖДЕНИЯ","ДЛЯ УТВЕРЖДЕНИЯ АВТОРОМ")]){
+   PROFILE+"t".repeat(40000),
+   PROFILE.replace("ДЕЙСТВУЮЩАЯ РЕДАКЦИЯ ПОСЛЕ УТВЕРЖДЕНИЯ","ДЛЯ УТВЕРЖДЕНИЯ АВТОРОМ")]){
   const r=await activateProfile(env,{profile});
   assert.equal(r.status,400);
  }
