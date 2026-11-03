@@ -516,11 +516,11 @@ test("Sanko never presents the previous diary day as events of today after midni
   assert(entries.some(x=>x.sql.includes("published_day_msk<?")),
    "When today's diary is empty, retrieve the latest dated entry");
   const prompt=observed.gemini[0];
-  assert(prompt.includes("за сегодняшний день "+today+" в доступном дневнике НЕТ записей"));
-  assert(prompt.includes("Самые новые доступные записи датированы "+yesterday));
-  assert(prompt.includes("НЕ называй старые события событиями сегодняшнего дня"));
+  assert(prompt.includes("ВНУТРЕННИЙ ОРИЕНТИР"));
+  assert(prompt.includes("Последние подтверждённые события относятся к "+yesterday));
+  assert(prompt.includes("Не приписывай их нынешнему дню"));
   assert(prompt.includes("Вчера произошло новое событие"));
-  assert(prompt.includes("ЯВНО назвав его дату"),"Last-known activity must be dated");
+  assert(!prompt.includes("ЯВНО назвав его дату"));
  }finally{globalThis.fetch=old;}
 });
 
@@ -549,7 +549,7 @@ test("a verified current-day diary entry remains first priority",async()=>{
   assert.equal(result.status,200);
   const prompt=observed.gemini[0];
   assert(prompt.includes("Сегодня утром нашли письмо для Румана."));
-  assert(!prompt.includes("в доступном дневнике НЕТ записей"));
+  assert(!prompt.includes("За нынешний день свежих записей пока нет"));
  }finally{globalThis.fetch=old;}
 });
 
