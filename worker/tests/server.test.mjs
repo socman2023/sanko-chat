@@ -475,3 +475,89 @@ test("missing token_usage table does not break character chat",async()=>{
   assert.equal((await r.json()).reply,"Здрав будь!");
  }finally{globalThis.fetch=original;}
 });
+
+
+test("Sanko never presents the previous diary day as events of today after midnight",async()=>{
+ const {env,observed}=envStub();
+ const today=dayInMoscow();
+ const yesterday=new Date(Date.parse(today+"T00:00:00Z")-86400000).toISOString().slice(0,10);
+ const entries=[];
+ env.DIARY_DB={prepare(sql){return {
+   bind(...params){this.params=params;return this;},
+   async all(){
+    entries.push({sql,params:this.params});
+    if(sql.includes("published_day_msk=?"))return {results:[]};
+    if(sql.includes("published_day_msk<?"))return {results:[{
+     post_id:52024,published_day_msk:yesterday,published_at:Date.now()/1000-20000,
+     source_url:"https://vk.ru/wall850667816_52024",
+     source_text:"Вчера произошло новое событие: повозка уехала в город."
+    }]};
+    return {results:[]};
+   }
+ };}};
+ const old=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  observed.gemini.push(JSON.parse(init.body).systemInstruction.parts[0].text);
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"За нынешний день ещё ничего нового не слыхал."}]}}]}),{status:200});
+ };
+ try{
+  const result=await worker.fetch(req("Расскажи, что сегодня случилось?"),env,ctx);
+  assert.equal(result.status,200);
+  assert(entries.some(x=>x.sql.includes("published_day_msk<?")),
+   "When today's diary is empty, retrieve the latest dated entry");
+  const prompt=observed.gemini[0].system;
+  assert(prompt.includes("за сегодняшний день "+today+" в доступном дневнике НЕТ записей"));
+  assert(prompt.includes("Самые новые доступные записи датированы "+yesterday));
+  assert(prompt.includes("НЕ называй их событиями сегодняшнего дня"));
+  assert(prompt.includes("Вчера произошло новое событие"));
+ }finally{globalThis.fetch=old;}
+});
+
+test("a verified current-day diary entry remains first priority",async()=>{
+ const {env,observed}=envStub();
+ const today=dayInMoscow();
+ env.DIARY_DB={prepare(sql){return {
+   bind(){return this;},
+   async all(){
+    if(sql.includes("published_day_msk=?"))return {results:[{
+     post_id:62024,published_day_msk:today,source_url:"https://vk.ru/wall850667816_62024",
+     source_text:"Сегодня утром нашли письмо для Румана."
+    }]};
+    if(sql.includes("published_day_msk<?"))throw Error("Yesterday fallback must not run with fresh diary");
+    return {results:[]};
+   }
+ };}};
+ const old=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  observed.gemini.push(JSON.parse(init.body).systemInstruction.parts[0].text);
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Письмо нынче нашли."}]}}]}),{status:200});
+ };
+ try{
+  const result=await worker.fetch(req("Что сегодня было?"),env,ctx);
+  assert.equal(result.status,200);
+  const prompt=observed.gemini[0].system;
+  assert(prompt.includes("Сегодня утром нашли письмо для Румана."));
+  assert(!prompt.includes("в доступном дневнике НЕТ записей"));
+ }finally{globalThis.fetch=old;}
+});
+
+test("Sanko's speech is not artificially capped to 8-30 words or stripped of dialect",async()=>{
+ const {env,observed}=envStub();
+ const old=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  observed.gemini.push(JSON.parse(init.body).systemInstruction.parts[0].text);
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Здрав будь!"}]}}]}),{status:200});
+ };
+ try{
+  const result=await worker.fetch(req("Ты как?"),env,ctx);
+  assert.equal(result.status,200);
+  const system=observed.gemini[0].system;
+  assert(!system.includes("8–30 слов"));
+  assert(system.includes("настоящий славонский говор"));
+  assert(system.includes("«шо»"));
+  assert(!system.includes("не вставляй «шо» и «як» нарочно"));
+ }finally{globalThis.fetch=old;}
+});
