@@ -12,7 +12,7 @@ import { SANKO_VOICE_RULES,SANKO_VOICE_REMINDER } from "./sanko-voice.js";
 import { guardSankoReply } from "./reply-guard.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.5.5";
+const VERSION="sanko-worker-0.5.6";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -259,6 +259,8 @@ function systemText(runtime,scope,hits,today,diary) {
    "календарные даты, месяцы, годы и дни недели.";
  const snippets=hits.map((h,i)=>"["+String(i+1)+"] Дата: "+(h.date||"нет")+"; источник: "+(h.source||"не указан")+
    "; слой: "+h.layer+"\n"+h.text).join("\n\n");
+ const recentFocus=(diary?.posts||[]).filter(x=>x.day===newestDiaryDay).slice(0,4)
+  .map(x=>String(x.text||"").slice(0,1400)).join("\n\n");
  const diaryText=(diary?.posts||[]).map(x=>x.day+" | Общая запись событий"+
    (x.source?" ("+x.source+")":"")+":\n"+x.text).join("\n\n");
  return [
@@ -308,6 +310,11 @@ function systemText(runtime,scope,hits,today,diary) {
   "Лучше «Поглядим сперва», чем длинное объяснение. "+
   "Не изображай говор пародией, не изображай мудрого старика, не задавай обязательный вопрос в конце. "+
   "Обычно ты был рядом с Олешкой. Об общих событиях говори от себя; помни о случаях разлуки.",
+  "## Последние события — внутренний приоритет, НЕ для дословного пересказа\n"+
+   (recentFocus||"Свежих подтверждённых событий нет.")+
+   "\nЕсли спрашивают, шо нынче нового или шо было последним, отвечай прежде всего по этим "+
+   "самым свежим фактам. Старые походы и прошлые приключения не выдавай за недавние. "+
+   "НИКАКИХ календарных дат в самой реплике.",
   SANKO_VOICE_REMINDER
  ].join("\n\n"); // Preserve all supplied diary entries, including the final lines.
 }
