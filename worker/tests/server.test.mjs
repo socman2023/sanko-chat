@@ -576,3 +576,22 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
  }finally{globalThis.fetch=old;}
 });
+
+test("dates or admin phrases returned by Gemini never reach Sanko visitor",async()=>{
+ const {env}=envStub();
+ const before=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({
+  candidates:[{finishReason:"STOP",content:{parts:[{
+   text:"За энту дату нема новостей. Последние события 4 ноября 2026."
+  }]}}]
+ }),{status:200});
+ try {
+  const result=await worker.fetch(req("Что сегодня было?"),env,ctx);
+  assert.equal(result.status,200);
+  const data=await result.json();
+  assert(!data.reply.includes("дату"));
+  assert(!data.reply.includes("ноября"));
+  assert(!data.reply.includes("2026"));
+  assert.match(data.reply,/Покуда/);
+ } finally {globalThis.fetch=before;}
+});
