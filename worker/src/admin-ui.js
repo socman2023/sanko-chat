@@ -82,7 +82,7 @@ export const ADMIN_HTML = String.raw`<!doctype html>
     </section>
     <section class="panel" style="margin-top:16px">
       <h3>Проверка и публикация новой редакции</h3>
-      <label for="profileFile">Файл <code>SANKO_PROFILE_v0.4_AUTHOR_REVIEW.txt</code></label>
+      <label for="profileFile">Файл <code>SANKO_PROFILE_v0.4_READY_TO_PUBLISH.txt</code></label>
       <input id="profileFile" type="file" accept=".txt,text/plain">
       <p class="hint" id="profileSelection">Выбери файл, просмотри его и только затем публикуй. Прежний профиль сохраняется для отката.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
