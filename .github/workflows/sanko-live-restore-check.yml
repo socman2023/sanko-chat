@@ -70,7 +70,7 @@ jobs:
             focusDate:data.knowledge?.focusDate,diaryPosts:data.knowledge?.diaryPosts,
             model:data.model,reply:data.reply},null,2));
           if(!response.ok||typeof data.reply!=="string"||!data.reply.trim())process.exit(1);
-          const words=(data.reply.match(/[\\p{L}\\p{N}]+/gu)||[]).length;
+          const words=data.reply.trim().split(/\s+/u).filter(Boolean).length;
           console.log("Default answer words:",words);
           if(words>30){console.error("Sanko exceeded 30-word default reply: "+words);process.exit(1);}
           if(data.knowledge?.focusDate!==todayMoscow) {
