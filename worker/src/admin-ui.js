@@ -40,6 +40,27 @@ export const ADMIN_HTML = String.raw`<!doctype html>
       <div class="card"><span>Разных IP сегодня</span><strong id="unique">—</strong></div>
       <div class="card"><span>Диалогов за 30 дней</span><strong id="conversations">—</strong></div>
     </div>
+    <h2>Расход токенов Gemini</h2>
+    <p class="hint" id="tokenNote">Расход токенов Gemini Free Tier, без платных тарифов.</p>
+    <div id="tokenUsage" hidden>
+      <div class="cards">
+        <div class="card"><span>Токенов сегодня</span><strong id="tokToday">—</strong></div>
+        <div class="card"><span>За 7 дней</span><strong id="tokWeek">—</strong></div>
+        <div class="card"><span>В этом месяце</span><strong id="tokMonth">—</strong></div>
+        <div class="card"><span>В среднем на измеренный вызов</span><strong id="tokAvg">—</strong></div>
+        <div class="card"><span>Входные за месяц</span><strong id="tokPrompt">—</strong></div>
+        <div class="card"><span>Выходные за месяц</span><strong id="tokCandidate">—</strong></div>
+        <div class="card"><span>Рассуждения за месяц</span><strong id="tokThoughts">—</strong></div>
+        <div class="card"><span>Кэшированные входные</span><strong id="tokCached">—</strong></div>
+        <div class="card"><span>Вызовов Gemini за месяц</span><strong id="tokCalls">—</strong></div>
+        <div class="card"><span>Вызовов с неизвестным расходом</span><strong id="tokUnknown">—</strong></div>
+      </div>
+      <p class="hint">Кэшированные токены уже входят во входные. Общие токены берутся из totalTokenCount. Неизвестный расход нельзя считать нулём.</p>
+      <h3>По моделям за 30 дней</h3>
+      <section class="panel"><div class="scroll"><table><thead><tr><th>Модель</th><th>Вызовов</th><th>Измерено</th><th>Токенов</th><th>Неизвестно</th></tr></thead><tbody id="tokenModels"></tbody></table></div></section>
+      <h3>Расход по дням (30 дней)</h3>
+      <section class="panel"><div class="scroll"><table><thead><tr><th>Дата</th><th>Вызовов</th><th>Токенов</th><th>Неизвестно</th></tr></thead><tbody id="tokenDaily"></tbody></table></div></section>
+    </div>
     <h2>Последние 30 дней</h2>
     <section class="panel"><div class="scroll"><table><thead><tr><th>Дата</th><th>Вопросов</th><th>IP</th><th>Нагрузка</th></tr></thead><tbody id="daily"></tbody></table></div></section>
     <h2>Модели и ответы за 30 дней</h2>
@@ -168,6 +189,37 @@ export const ADMIN_SCRIPT = String.raw`
   if(!res.ok)throw Error(res.status===401?"Неверный административный токен или секрет ещё не настроен.":"Ошибка "+res.status+": "+(data.error||"нет ответа"));
   return data;
  }
+ function showTokenUsage(data) {
+  const t=data?.tokenUsage;
+  const ok=t?.status==="ready";
+  $("tokenUsage").hidden=!ok;
+  $("tokenNote").textContent=ok
+   ?t.note+" Число вызовов без данных о токенах учитывается отдельно."
+   :"Учёт токенов пока недоступен. Проверьте D1-миграцию 0002 и версию Worker.";
+  if(!ok)return;
+  for(const [id,v] of [
+   ["tokToday",t.today.total],["tokWeek",t.week.total],["tokMonth",t.month.total],
+   ["tokAvg",t.averagePerMeteredCall==null?"—":n(t.averagePerMeteredCall)],
+   ["tokPrompt",t.month.prompt],["tokCandidate",t.month.candidate],
+   ["tokThoughts",t.month.thoughts],["tokCached",t.month.cached],
+   ["tokCalls",t.month.calls],["tokUnknown",t.month.unknownCalls]
+  ])$(id).textContent=typeof v==="string"?v:n(v);
+  const models=$("tokenModels");models.replaceChildren();
+  for(const x of t.models){
+   const tr=el("tr");
+   for(const value of [x.model,n(x.calls),n(x.meteredCalls),n(x.total),n(x.unknownCalls)])
+    tr.appendChild(el("td",value));
+   models.appendChild(tr);
+  }
+  if(!t.models.length){const tr=el("tr");tr.appendChild(el("td","Пока нет измерений."));models.appendChild(tr);}
+  const daily=$("tokenDaily");daily.replaceChildren();
+  for(const x of t.daily.slice().reverse()){
+   const tr=el("tr");
+   for(const value of [x.day,n(x.calls),n(x.total),n(x.unknownCalls)])
+    tr.appendChild(el("td",value));
+   daily.appendChild(tr);
+  }
+ }
  function showStatus(data) {
   val("today",data.today.admitted);val("week",data.week);val("month",data.month.admitted);
   val("ip",data.today.fromThisIp);val("unique",data.today.uniqueIps);
@@ -191,6 +243,7 @@ export const ADMIN_SCRIPT = String.raw`
     }
     if(!entries.length)ul.append(el("li","Пока нет данных."));
   }
+  showTokenUsage(data);
   $("stats").hidden=false;
  }
  async function loadThread(id) {
