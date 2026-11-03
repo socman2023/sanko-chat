@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { needsVoiceRepair,makeVoiceRepairPrompt,CANON_SANKO_SPEECH } from "../src/sanko-voice-check.js";
+import { needsVoiceRepair,makeVoiceRepairPrompt,CANON_SANKO_SPEECH,unsafeVoiceRewrite } from "../src/sanko-voice-check.js";
 
 test("quality gate catches the real generic and forced-modernism examples",()=>{
  const screenshots=[
@@ -36,4 +36,14 @@ test("repair prompt uses canonical speech, not mechanical word swaps or invented
  assert(CANON_SANKO_SPEECH.length>=10);
  assert(prompt.system.includes("Тятя слов на ветер не бросает"));
  assert(prompt.system.includes("Надо посмотреть"));
+});
+
+test("editor cannot emit fabricated dialect vocabulary",()=>{
+ for(const line of [
+  "Далебени мы их обманули. Еле ноги унесли!",
+  "Чинота со стражниками пришла вязать.",
+  "Чинушами тута никого не напугаешь.",
+  "Сполохом глаза стражникам залепил, а мы ушли."
+ ])assert(unsafeVoiceRewrite(line),line);
+ assert(!unsafeVoiceRewrite("Тятя слов на ветер не бросает. Ежли мешкает — знамо, повод есть."));
 });
