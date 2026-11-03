@@ -570,7 +570,7 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(system.includes("Если спрашивают подробно — тогда расскажи подробнее"));
   assert(system.includes("Не повторяй всю последовательность приключений"));
   assert(system.includes("Как разговаривает Санко"));
-  assert(system.includes("Говори как Санко"));
+  assert(system.includes("Ты Санко, славонский мальчишка"));
   assert(system.includes("Перед ответом проверь"));
   assert(system.includes("«энто» или «шо»"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
