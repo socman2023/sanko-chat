@@ -20,6 +20,7 @@ function validate(value){
  if(typeof value!=="string")return "profile_not_text";
  if(value.length<7500||value.length>33000)return "profile_length_out_of_range";
  if(!value.startsWith(PREFIX))return "unapproved_profile_version";
+ if(value.includes("ДЛЯ УТВЕРЖДЕНИЯ")||value.includes("НЕ ЗАПИСАН")||value.includes("черновик для критического"))return "draft_profile_not_publishable";
  if(CRITICAL.some(word=>!value.includes(word)))return "profile_missing_required_canon";
  if(value.includes("\u0000"))return "invalid_profile_text";
  return "";
