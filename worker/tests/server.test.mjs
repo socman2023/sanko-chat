@@ -97,7 +97,8 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert(observed.kv.includes("sanko:profile:v1"));
   assert(!observed.kv.some(x=>x.startsWith("oleshka:")));
   const instructions=observed.gemini[0].system;
-  assert.match(instructions,/несколько живых фраз/);
+  assert.match(instructions,/одна или две короткие фразы/);
+  assert.match(instructions,/примерно 8–30 слов/);
   assert.match(instructions,/настоящий славонский говор/);
   assert.match(instructions,/Обычно ты был рядом с Олешкой/);
   assert.match(instructions,/Не сообщай выдуманные текущие события/);
@@ -544,7 +545,7 @@ test("a verified current-day diary entry remains first priority",async()=>{
  }finally{globalThis.fetch=old;}
 });
 
-test("Sanko's speech is not artificially capped to 8-30 words or stripped of dialect",async()=>{
+test("Sanko uses short default replies while retaining dialect and detailed-on-request option",async()=>{
  const {env,observed}=envStub();
  const old=globalThis.fetch;
  globalThis.fetch=async(_url,init)=>{
@@ -556,7 +557,10 @@ test("Sanko's speech is not artificially capped to 8-30 words or stripped of dia
   const result=await worker.fetch(req("Ты как?"),env,ctx);
   assert.equal(result.status,200);
   const system=observed.gemini[0];
-  assert(!system.includes("8–30 слов"));
+  assert(system.includes("8–30 слов"));
+  assert(system.includes("1–2 короткие фразы"));
+  assert(system.includes("Если спрашивают подробно — тогда расскажи подробнее"));
+  assert(system.includes("Не повторяй всю последовательность приключений"));
   assert(system.includes("настоящий славонский говор"));
   assert(system.includes("«шо»"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
