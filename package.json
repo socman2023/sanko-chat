@@ -3,6 +3,6 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "test": "node --check assets/app.js && node --check assets/config.js && node tests/static-check.mjs && cd worker && npm run check && npm test"
+    "test": "node --check assets/app.js && node --check assets/config.js && node tests/static-check.mjs && node --test tests/vk-miniapp-check.mjs && cd worker && npm run check && npm test"
   }
 }
