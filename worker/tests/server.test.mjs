@@ -102,7 +102,7 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert.match(instructions,/Говор у тебя свой, привычный с детства/);
   assert.match(instructions,/ОБЯЗАТЕЛЬНЫЙ ЗАКОН ТВОЕЙ РЕЧИ — ВСЕГДА/);
   for(const word of ["шо","як","якой","токмо","тока","энто","энтот","ежли","тута","хто","куды"])
-   assert(instructions.includes(word),"Missing canon/author-approved form: "+word);
+   assert(instructions.toLowerCase().includes(word),"Missing canon/author-approved form: "+word);
   assert.match(instructions,/Ты шо, дырку протереть хошь/);
   assert.match(instructions,/Про Тариба-то писать будете\? Як живет, шо творит/);
   assert(!instructions.includes("Слова «шо», «анэ», «зело» допустимы в подходящей ситуации, иногда в шутку"));
@@ -269,7 +269,7 @@ test("model fallback after 429: primary overloaded, first reserve succeeds",asyn
   const data=await response.json();
   assert.equal(data.model,"gemini-3.1-flash-lite");
   assert.equal(data.fallbackUsed,true);
-  assert.equal(data.reply,"Я тут. Скажи, чего хотел?");
+  assert.equal(data.reply,"Я тута. Скажи, чего хотел?");
   assert.deepEqual(calls.map(x=>x.model),["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
   assert.deepEqual(calls[0].body.systemInstruction,calls[1].body.systemInstruction);
   assert.deepEqual(calls[0].body.contents,calls[1].body.contents);
@@ -572,7 +572,7 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(system.includes("Как разговаривает Санко"));
   assert(system.includes("Ты Санко, славонский мальчишка"));
   assert(system.includes("Перед ответом проверь"));
-  assert(system.includes("«энто» или «шо»"));
+  assert(system.includes("ВО ВСЕХ собственных репликах употребляй обязательные формы"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
  }finally{globalThis.fetch=old;}
 });
