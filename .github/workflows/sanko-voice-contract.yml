@@ -1,0 +1,26 @@
+name: Sanko canonical voice contract (offline)
+on:
+  pull_request:
+    paths:
+      - "quality/sanko/**"
+      - ".github/workflows/sanko-voice-contract.yml"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test mandatory always-on Sanko dialect
+        run: node --test quality/sanko/voice_contract.test.mjs
+      - name: Reject known bad character voice
+        run: |
+          if node quality/sanko/check_reply.mjs "Ну, здрав будь. Как у тебя дела?"; then
+            echo "Bad literary Russian unexpectedly passed"
+            exit 1
+          fi
+          node quality/sanko/check_reply.mjs "Шо у тебя нового? Энто важно, тока не спеши."
