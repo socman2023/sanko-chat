@@ -100,7 +100,7 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert.match(instructions,/одна или две короткие фразы/);
   assert.match(instructions,/примерно 8–30 слов/);
   assert.match(instructions,/Говор у тебя свой, привычный с детства/);
-  assert.match(instructions,/Твои привычные живые словечки и формы/);
+  assert.match(instructions,/ОБЯЗАТЕЛЬНЫЙ ЗАКОН ТВОЕЙ РЕЧИ — ВСЕГДА/);
   for(const word of ["шо","як","якой","токмо","тока","энто","энтот","ежли","тута","хто","куды"])
    assert(instructions.includes(word),"Missing canon/author-approved form: "+word);
   assert.match(instructions,/Ты шо, дырку протереть хошь/);
@@ -639,4 +639,38 @@ test("Sanko sends authentic speech examples BEFORE real history without a second
   assert.equal(requests[0].generationConfig.temperature,0.4);
   assert.equal(observed.usageInserts.length,1);
  }finally{globalThis.fetch=old;}
+});
+
+
+test("live chat normalizes all approved Sanko words before reply and storage",async()=>{
+ const {env,observed}=envStub();
+ const before=globalThis.fetch;let calls=0;
+ const raw="Что это? Какой выбор? Только если кто там. Куда и как? Этот тут, а меня здесь нет. Мне этих людей каждый день видеть? Хочешь?";
+ const expected="Шо энто? Якой выбор? Тока ежли хто тама. Куды и як? Энтот тута, а мя тута нема. Мене энтих людей кажный день видеть? Хошь?";
+ globalThis.fetch=async()=>{
+  calls++;
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:raw}]}}],
+   usageMetadata:{promptTokenCount:100,candidatesTokenCount:48,totalTokenCount:148}}),{status:200});
+ };
+ try{
+  const r=await worker.fetch(req("Санко, чего скажешь?"),env,ctx);
+  assert.equal(r.status,200);
+  const data=await r.json();
+  assert.equal(data.reply,expected);
+  assert.equal(calls,1,"No additional calls, Free Tier preserved");
+  assert.equal(observed.usageInserts.length,1);
+  assert.equal(observed.usageInserts[0].values[9],148);
+ }finally{globalThis.fetch=before;}
+});
+
+test("a single next-turn reply must not regress to literary pronouns",async()=>{
+ const {env}=envStub(),original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[
+  {text:"Ну, здрав будь. Как у тебя дела? Это я только спросить хотел."}
+ ]}}]}),{status:200});
+ try{
+  const r=await worker.fetch(req("Привет, Санко!"),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal((await r.json()).reply,"Ну, здрав будь. Як у тебя дела? Энто я тока спросить хотел.");
+ }finally{globalThis.fetch=original;}
 });
