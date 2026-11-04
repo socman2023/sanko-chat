@@ -1,9 +1,11 @@
 // The Rossi/Slavon/Borusk pantheon is polytheistic (podnebesie_gods.docx).
-// Oleshka's published diary attests "слава богам" and "О, боги!".
+// Books 2-3 and the published diary attest "Слава Вароку" as the
+// natural expression used by Oleshka and Sanko. Generic "слава богам"
+// is not the preferred idiom for these two characters.
 // Only alter a character's unquoted standard monotheistic exclamations.
 // Keep a foreign speaker's literal quotations intact.
 const idioms=[
- [/(?<![\p{L}\p{N}])(слава\s+)богу(?![\p{L}\p{N}])/giu,(_whole,prefix)=>prefix+"богам"],
+ [/(?<![\p{L}\p{N}])(слава\s+)богу(?![\p{L}\p{N}])/giu,(_whole,prefix)=>prefix+"Вароку"],
  [/(?<![\p{L}\p{N}])боже\s+мой(?![\p{L}\p{N}])/giu,()=>"О боги"],
  [/(?<![\p{L}\p{N}])господи(?![\p{L}\p{N}])/giu,()=>"О боги"]
 ];
