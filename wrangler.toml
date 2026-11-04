@@ -7,6 +7,8 @@ workers_dev = true
 
 [vars]
 ALLOWED_ORIGIN = "https://socman2023.github.io"
+# Public ID of Sanko's own VK Mini App. NOT Sanko's personal VK profile ID.
+VK_APP_ID = "54875852"
 # Same approved Gemini cascade as working Oleshka Worker v3.9.1.
 # Primary is used first; fallbacks only for retryable overload, timeout,
 # transient API errors or empty/truncated answers. Billing tier unchanged.
