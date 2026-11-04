@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#233d34">
+  <meta name="referrer" content="no-referrer">
   <meta name="description" content="Разговор с Санко — героем мира Поднебесья.">
   <title>Санко — разговор из Поднебесья</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Forum&family=Neucha&family=Ruslan+Display&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./assets/styles.css">
-  <script defer src="https://unpkg.com/@vkontakte/vk-bridge@2/dist/browser.min.js"></script>
+  <script defer src="https://unpkg.com/@vkontakte/vk-bridge@2.15.12/dist/browser.min.js"></script>
   <script defer src="./assets/config.js"></script>
   <script defer src="./assets/app.js"></script>
 </head>
@@ -48,7 +49,7 @@
       <div class="composer-wrap">
         <form id="composer" class="composer">
           <label class="sr-only" for="input">Сообщение Санко</label>
-          <textarea id="input" rows="1" maxlength="4000" placeholder="Напиши Санко…" required></textarea>
+          <textarea id="input" rows="1" maxlength="4000" placeholder="Напиши Санко…" enterkeyhint="send" required></textarea>
           <button id="send" class="send" type="submit" aria-label="Отправить сообщение" title="Отправить">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 20 4l-6 16-3.5-6.5L4 12Z"/><path d="m10.5 13.5 9.5-9.5"/></svg>
           </button>

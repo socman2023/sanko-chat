@@ -34,7 +34,7 @@
   let warnedPreview = false;
   let unlockTimer = 0;
   let vkFirstName = '', vkFirstNameUserId = 0;
-  const FAILURE_NOTICE = 'Что-то связь не идёт. Загляни попозже, ладно?';
+  const FAILURE_NOTICE = 'Связь не ладится. Загляни погодя, ладно?';
 
   function makeId() {
     if (crypto.randomUUID) return crypto.randomUUID();
@@ -140,46 +140,104 @@
     }
   }
   window.addEventListener('focus', applyLimitLock);
+  // Only signed VK launch parameters are forwarded for SERVER-SIDE verification.
+  // Their presence changes layout only; it never grants a visitor a role.
   function signedVkLaunch() {
     const qs = new URLSearchParams(window.location.search);
-    return qs.has('vk_user_id') && qs.has('vk_app_id') && qs.has('sign') ? window.location.search : '';
+    return qs.has('vk_user_id') && qs.has('vk_app_id') && qs.has('sign')
+      ? window.location.search : '';
   }
   const vkLaunch = signedVkLaunch();
+  const IN_VK = Boolean(vkLaunch);
+
+  function updateVkInsets(value) {
+    if (!IN_VK || !value || typeof value !== 'object') return;
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+      const num = Number(value[side]);
+      if (!Number.isFinite(num) || num < 0 || num > 150) continue;
+      document.documentElement.style.setProperty('--vk-inset-' + side, Math.round(num) + 'px');
+    }
+  }
+  function syncVkViewport() {
+    if (!IN_VK) return;
+    const height = Number(window.visualViewport?.height || window.innerHeight);
+    if (Number.isFinite(height) && height >= 180) {
+      document.documentElement.style.setProperty('--vk-visible-height', Math.round(height) + 'px');
+    }
+  }
+  if (IN_VK) {
+    document.documentElement.classList.add('vk-embedded');
+    syncVkViewport();
+    window.addEventListener('resize', syncVkViewport);
+    window.visualViewport?.addEventListener('resize', syncVkViewport);
+  }
+
+  function withTimeout(promise, ms) {
+    let timer;
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('VK operation timeout')), ms);
+      })
+    ]).finally(() => clearTimeout(timer));
+  }
 
   async function initVk() {
-    if (!vkLaunch || PREVIEW) return;
-    try {
-      if (window.vkBridge?.send) {
-        await window.vkBridge.send('VKWebAppInit').catch(() => {});
+    if (!IN_VK || PREVIEW) return;
+
+    // The chat is already rendered; slow, missing or blocked VK Bridge
+    // must never leave visitors staring at an empty window.
+    const bridge = window.vkBridge;
+    if (bridge && typeof bridge.send === 'function') {
+      if (typeof bridge.subscribe === 'function') {
+        try {
+          bridge.subscribe(event => {
+            if (event?.detail?.type === 'VKWebAppUpdateConfig') {
+              updateVkInsets(event.detail.data?.insets);
+            }
+          });
+        } catch (_) {}
+      }
+
+      try {
+        await withTimeout(bridge.send('VKWebAppInit'), 1600);
+        // Optional: some VK clients report insets in the config response;
+        // other clients send VKWebAppUpdateConfig asynchronously.
+        const config = await withTimeout(bridge.send('VKWebAppGetConfig'), 1600).catch(() => null);
+        updateVkInsets(config?.insets);
+      } catch (_) { /* VK platform initialization failure is nonfatal. */ }
+
+      try {
         const signedId = Number(new URLSearchParams(vkLaunch.slice(1)).get('vk_user_id'));
-        const info = await Promise.race([
-          window.vkBridge.send('VKWebAppGetUserInfo'),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('VK timeout')), 2500))
-        ]).catch(() => null);
+        const info = await withTimeout(bridge.send('VKWebAppGetUserInfo'), 2500);
         if (Number(info?.id) === signedId && typeof info?.first_name === 'string') {
           vkFirstName = info.first_name;
           vkFirstNameUserId = signedId;
         }
-      }
-      // VK role is trusted ONLY if the server verifies the signed launch params.
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), 6500);
-      try {
-        const response = await fetch(API.replace(/\/api\/chat$/, '/api/session'), {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({vkLaunch, vkFirstName, vkFirstNameUserId}),
-          signal: ctl.signal
-        });
-        if (response.ok) {
-          const result = await response.json();
-          if (result.verified === true &&
-              ['friend', 'follower', 'community', 'stranger'].includes(result.role)) {
-            visitorRole = result.role;
-            if (typeof result.firstName === 'string') visitorName = result.firstName.slice(0, 45);
-          }
+      } catch (_) {}
+    }
+
+    // This endpoint validates the VK launch signature WITH THE APP SECRET
+    // stored in Cloudflare. Browser-supplied names / statuses are untrusted.
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 6500);
+    try {
+      const response = await fetch(API.replace(/\/api\/chat$/, '/api/session'), {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({vkLaunch, vkFirstName, vkFirstNameUserId}),
+        signal: ctl.signal
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.verified === true &&
+            ['friend', 'follower', 'community', 'stranger'].includes(result.role)) {
+          visitorRole = result.role;
+          if (typeof result.firstName === 'string') visitorName = result.firstName.slice(0, 45);
+          if (!conversation.some(m => m.role === 'user' || m.role === 'model')) render();
         }
-      } finally { clearTimeout(t); }
-    } catch (_) { /* Fall back to anonymous; never trust browser-only role. */ }
+      }
+    } catch (_) { /* Never infer friends/followers from an unsigned response. */ }
+    finally { clearTimeout(t); }
   }
 
   form.addEventListener('submit', async event => {
@@ -257,7 +315,7 @@
       clearTimeout(t);
       setBusy(false);
       applyLimitLock();
-      if (!input.disabled) input.focus();
+      if (!input.disabled && !IN_VK) input.focus();
     }
   });
   input.addEventListener('input', resize);
@@ -274,7 +332,7 @@
     if (!PREVIEW) { try { localStorage.removeItem(STORAGE_KEY); } catch (_) {} }
     save(); error(''); input.value=''; render(); resize();
     applyLimitLock();
-    if (!input.disabled) input.focus();
+    if (!input.disabled && !IN_VK) input.focus();
   }
   newButton.addEventListener('click', () => {
     if (busy) return;
@@ -291,9 +349,9 @@
       try { prev = Number(localStorage.getItem(LAST_GREETING_KEY)) || 0; } catch (_) {}
       greetingId = chooseGreeting(prev);
     }
-    if (!PREVIEW) await initVk();
     render(); resize(); save();
     applyLimitLock();
+    if (!PREVIEW && IN_VK) void initVk();
   }
   input.disabled = true; send.disabled = true;
   start().catch(() => { render(); resize(); applyLimitLock(); });
