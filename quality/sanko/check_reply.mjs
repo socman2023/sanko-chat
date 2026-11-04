@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { maskQuotedSankoText } from "../../worker/src/sanko-mandatory-forms.js";
 
 const dir=dirname(fileURLToPath(import.meta.url));
 export const contract=JSON.parse(readFileSync(join(dir,"voice_contract.json"),"utf8"));
@@ -19,9 +20,10 @@ const bannedPhrases=[
 // Lint does NOT auto-rewrite or establish factual canon.
 export function lintSankoReply(text) {
  const reply=String(text||"");
+ const lexicalReply=maskQuotedSankoText(reply);
  const problems=[];
  for(const item of rules) {
-  for(const match of reply.matchAll(item.re))
+  for(const match of lexicalReply.matchAll(item.re))
    problems.push({type:"literary_equivalent",word:match[0],position:match.index,
     expected:item.required,rule:item.source});
  }
