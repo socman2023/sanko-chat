@@ -1,0 +1,62 @@
+name: Sanko VK first-turn context smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sanko-vk-context-smoke.yml"
+      - "worker/src/sanko-opening-context.js"
+      - "worker/src/index.js"
+      - "assets/app.js"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify live Worker version and diary
+        shell: bash
+        run: |
+          set -eu
+          for i in $(seq 1 18); do
+            body="$(curl -fsS --max-time 9 https://sanko-chat-api.boysinger2008.workers.dev/health || true)"
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.7" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+              printf '%s' "$body" | jq '{version,diarySync}'
+              exit 0
+            fi
+            sleep 8
+          done
+          echo "New Worker v0.6.7 / diary not verified" >&2
+          exit 1
+      - name: Test first reply referencing the actual VK greeting
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const { lintSankoReply } = await import("./quality/sanko/check_reply.mjs");
+          const url="https://sanko-chat-api.boysinger2008.workers.dev/api/chat";
+          const response=await fetch(url,{
+            method:"POST",
+            headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
+            body:JSON.stringify({
+              message:"То же, что и у тебя.",
+              openingGreeting:"О, Княжич! Здрав будь. Шо у тебя нового?",
+              history:[],
+              conversationId:crypto.randomUUID()
+            })
+          });
+          const data=await response.json();
+          const reply=data.reply||"";
+          console.log(JSON.stringify({http:response.status,
+            worker:"sanko-worker-0.6.7",
+            model:data.model,reply,diaryPosts:data.knowledge?.diaryPosts},null,2));
+          if(!response.ok||!reply.trim())throw Error("First reply unavailable");
+          const words=reply.trim().split(/\s+/u).length;
+          if(words>35)throw Error("Unexpectedly long greeting response");
+          if(lintSankoReply(reply).length)throw Error("Mandatory Sanko forms / dates violated");
+          if(/куды мы нынче пой|куда мы сейчас пой|ты в энтой стороне забыл|про дело, а ты шутки|энто мы завсегда успеем/iu.test(reply))
+            throw Error("First reply derailed into an imagined errand or journey");
+          NODE
