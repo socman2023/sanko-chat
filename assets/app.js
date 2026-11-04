@@ -32,6 +32,7 @@
   let conversation = [], conversationId = '', greetingId = 0, focusDate = '';
   let openingGreetingShown = '';
   let limitUntil = 0, busy = false, visitorRole = 'stranger', visitorName = '';
+  let visitorIsOleshka = false; // Set only by the server after signed VK launch verification.
   let warnedPreview = false;
   let unlockTimer = 0;
   let vkFirstName = '', vkFirstNameUserId = 0;
@@ -55,6 +56,7 @@
     return next;
   }
   function greeting() {
+    if (visitorIsOleshka) return 'О, братец! Здрав будь. Шо скажешь?';
     const text = GREETINGS[greetingId - 1] || GREETINGS[0];
     // A name is shown only after /api/session confirms a signed VK launch.
     // This is a personal greeting, not an invented memory of prior chats.
@@ -253,6 +255,7 @@
         if (result.verified === true &&
             ['friend', 'follower', 'community', 'stranger'].includes(result.role)) {
           visitorRole = result.role;
+          visitorIsOleshka = result.identity === 'oleshka';
           if (typeof result.firstName === 'string') visitorName = result.firstName.slice(0, 45);
           if (!busy && !conversation.some(m => m.role === 'user' || m.role === 'model')) render();
         }
