@@ -4,6 +4,8 @@ name = "sanko-chat-api"
 main = "worker/src/index.js"
 compatibility_date = "2026-10-31"
 workers_dev = true
+# Preserve VK_OWNER_USER_ID and other dashboard variables between GitHub deployments.
+keep_vars = true
 
 [vars]
 ALLOWED_ORIGIN = "https://socman2023.github.io"
