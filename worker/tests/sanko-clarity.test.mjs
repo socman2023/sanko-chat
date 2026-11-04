@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sankoClarificationCue } from "../src/sanko-clarity.js";
+import { sankoClarificationCue,repairSankoLexicalClarification } from "../src/sanko-clarity.js";
 
 const history=[
  {role:"user",text:"А у тебя?"},
@@ -30,4 +30,32 @@ test("a clarification must never treat a bad model answer as confirmed canon",()
  assert.match(cue,/свои[мх] прошлым словам/);
  assert.match(cue,/утверждённому канону/);
  assert.equal(sankoClarificationCue("Не понял",{not:"a history"}),"");
+});
+
+test("a language question protects literary glosses instead of changing after into опосля",()=>{
+ assert.equal(repairSankoLexicalClarification(
+  "Опосля — энто значит после.","Чего «опосля»?",[
+   {role:"model",text:"Опосля ужина поплывём."}
+  ]),"Опосля — энто значит «после».");
+ assert.equal(repairSankoLexicalClarification(
+  "Опосля — энто значит опосля.","Чего «опосля»?",[
+   {role:"model",text:"Опосля ужина поплывём."}
+  ]),"Опосля — энто значит «после».");
+ assert.equal(repairSankoLexicalClarification(
+  "Опосля ужина выйдем.","Что было?",history),"Опосля ужина выйдем.");
+});
+
+test("the exact screenshot's bad earlier turn triggers plain correction, not circular explanation",()=>{
+ const old=[{role:"user",text:"Сам говори, что было?"},
+  {role:"model",text:"Плывем опосля по реке на джонке. Ищем баржу, куды Элинку увезли."}];
+ for(const proposed of [
+  "Опосля — энто значит опосля. Опосля того, як поговорили...",
+  "Опосля — энто значит после."
+ ]){
+  const out=repairSankoLexicalClarification(proposed,'Чего "опосля"?',old);
+  assert.equal(out,"Лишнее слово вставил. Плывем по реке на джонке.");
+  assert(!out.includes("после")&&!out.includes("опосля"));
+ }
+ assert.equal(repairSankoLexicalClarification("Опосля ужина сели на лодку.",
+  "А что было дальше?",old),"Опосля ужина сели на лодку.");
 });
