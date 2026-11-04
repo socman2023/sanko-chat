@@ -15,6 +15,17 @@ export function smoothSankoSpeech(value) {
   /(?<![\p{L}\p{N}])([Ее]ле\s+удрали)\s+тута(?=\s*[.!?]|$)/giu,
   "$1"
  );
+ // If Gemini invents a courtly «чинуша» where it actually describes
+ // the city guard arriving, retain the stated action but remove that actor.
+ reply=reply.replace(
+  /(?<![\p{L}\p{N}])чинуша\s+со\s+стражей\s+(?:заявился|явился|пришёл)(?=[\s.!?,;:]|$)/giu,
+  match=>/^[А-ЯЁ]/u.test(match)?"Стража явилась":"стража явилась"
+ );
+ // «Хошь» means 2nd person singular «хочешь», not plural «мы хотели».
+ reply=reply.replace(
+  /(?<![\p{L}\p{N}])(мы\s+его\s+обмануть)\s+хошь(?=[\s.!?,;:]|$)/giu,
+  "$1 хотели"
+ );
  // «Покуда» is temporal, not a natural one-word goodbye.
  // Avoid turning a modern parting «Пока!» into «Покуда!».
  reply=reply.replace(/^\s*(?:Ну,?\s*)?Пока[.!\s]*$/iu,"Бывай!");
