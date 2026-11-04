@@ -1031,3 +1031,25 @@ test("full six-turn Sanko conversation preserves actual history and corrects unc
   assert.equal(observed.usageInserts.length,transcript.length);
  }finally{globalThis.fetch=original;}
 });
+
+
+test("Sanko's live API corrects Christian praise to canonical 'Слава Вароку' before storage",async()=>{
+ const {env,observed}=envStub(),original=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=async()=>{
+  calls++;
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Живы, слава Богу! Плывем на джонке."}]}
+  }]}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(req("Как дела?"),env,ctx);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.reply,"Живы, слава Вароку! Плывем на джонке.");
+  assert.equal(calls,1,"No extra Gemini call needed to correct a faith idiom");
+  assert.equal(observed.insertions.length,1);
+  assert(!JSON.stringify(observed.insertions).includes("слава Богу"),
+   "Saved reply must not preserve the wrong exclamation");
+ }finally{globalThis.fetch=original;}
+});
