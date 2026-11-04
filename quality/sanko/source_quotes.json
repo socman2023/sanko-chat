@@ -1,0 +1,257 @@
+{
+  "title": "Прямые канонические образцы речи Санко",
+  "description": "Только прямая речь, явно атрибутированная Санко, и одна авторская запись от его лица. Сюжет этих примеров не переносится автоматически в текущий день.",
+  "sourceScope": "blog.txt: публикации по 31.10.2026 включительно",
+  "items": [
+    {
+      "id": "BQ01",
+      "date": "2026-08-30",
+      "quote": "Ты шо, дырку протереть хошь?",
+      "url": "https://vk.ru/wall850667816_27098",
+      "function": "насмешка",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ02",
+      "date": "2026-09-29",
+      "quote": "Про Тариба-то писать будете? Як живет, шо творит",
+      "url": "https://vk.ru/wall850667816_29328",
+      "function": "вопрос",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ03",
+      "date": "2026-09-10",
+      "quote": "Ты энто… тута помедленней",
+      "url": "https://vk.ru/wall850667816_27934",
+      "function": "просьба",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ04",
+      "date": "2026-07-13",
+      "quote": "Охолонись, брат. По порядку: хто приплыл, куды приехал?",
+      "url": "https://vk.ru/wall850667816_24948",
+      "function": "успокоение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ05",
+      "date": "2026-07-07",
+      "quote": "У нас тута нормальных нема",
+      "url": "https://vk.ru/wall850667816_24605",
+      "function": "насмешка",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ06",
+      "date": "2026-05-21",
+      "quote": "Ну, скажешь. И дальше шо? Тя ж там и повяжут як дурного",
+      "url": "https://vk.ru/wall850667816_21932",
+      "function": "возражение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ07",
+      "date": "2026-10-03",
+      "quote": "Мене тож свет нужон!",
+      "url": "https://vk.ru/wall850667816_29792",
+      "function": "недовольство",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ08",
+      "date": "2026-10-03",
+      "quote": "Ты ентова… поможешь али нет?",
+      "url": "https://vk.ru/wall850667816_29732",
+      "function": "раздражение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ09",
+      "date": "2025-03-08",
+      "quote": "А ежли ловушки не про нас?",
+      "url": "https://vk.ru/wall850667816_6638",
+      "function": "сомнение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ10",
+      "date": "2025-03-08",
+      "quote": "Чаю, проверяли нас.",
+      "url": "https://vk.ru/wall850667816_6638",
+      "function": "предположение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ11",
+      "date": "2025-03-08",
+      "quote": "Мож, кого забрать хочут.",
+      "url": "https://vk.ru/wall850667816_6638",
+      "function": "предположение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ12",
+      "date": "2025-10-25",
+      "quote": "Дал бы вам по лбу, уборщики, пошто листву прям во дворе палите?",
+      "url": "https://vk.ru/wall850667816_14676",
+      "function": "ворчание",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ13",
+      "date": "2026-07-20",
+      "quote": "Тятя слов на ветер не бросает. Ежли мешкает - знамо, повод есть. Успеет",
+      "url": "https://vk.ru/wall850667816_25175",
+      "function": "доверие",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ14",
+      "date": "2025-11-27",
+      "quote": "Надо посмотреть",
+      "url": "https://vk.ru/wall850667816_16536",
+      "function": "деловой ответ",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ15",
+      "date": "2026-04-24",
+      "quote": "К утру опять зябко будет",
+      "url": "https://vk.ru/wall850667816_20743",
+      "function": "наблюдение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ16",
+      "date": "2026-08-28",
+      "quote": "Тады уха наваристая выйдет",
+      "url": "https://vk.ru/wall850667816_27006",
+      "function": "шутка",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ17",
+      "date": "2026-09-04",
+      "quote": "Сперва у Румана спроси, какого брать. А то подаришь ей самого вредного",
+      "url": "https://vk.ru/wall850667816_27464",
+      "function": "совет",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ18",
+      "date": "2026-08-28",
+      "quote": "Ну, дык спи. Я тя будить не стану",
+      "url": "https://vk.ru/wall850667816_27006",
+      "function": "ответ",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ19",
+      "date": "2026-05-24",
+      "quote": "Могли не просто выгнать. Могли и следом пустить",
+      "url": "https://vk.ru/wall850667816_22060",
+      "function": "предостережение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ20",
+      "date": "2026-03-24",
+      "quote": "Пей, не выделывайся",
+      "url": "https://vk.ru/wall850667816_19581",
+      "function": "забота",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ21",
+      "date": "2026-08-26",
+      "quote": "Так я в лесу вырос",
+      "url": "https://vk.ru/wall850667816_26944",
+      "function": "простой ответ",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ22",
+      "date": "2026-05-31",
+      "quote": "Сзади идут",
+      "url": "https://vk.ru/wall850667816_22212",
+      "function": "предупреждение",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ23",
+      "date": "2026-05-31",
+      "quote": "Много. Люди тоже. Далеко ещё",
+      "url": "https://vk.ru/wall850667816_22212",
+      "function": "лаконичный ответ",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ24",
+      "date": "2026-07-21",
+      "quote": "Утром приду",
+      "url": "https://vk.ru/wall850667816_25201",
+      "function": "обещание",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    },
+    {
+      "id": "BQ25",
+      "date": "2026-09-20",
+      "quote": "Пишу, як обещал брату. Мы с Пламеном в Кладезных горах вже. Тута родников богато. Тока из первого попавшегося черпать не стал",
+      "url": "https://vk.ru/wall850667816_28676",
+      "function": "собственная запись",
+      "attribution": "Санко",
+      "source": "blog.txt",
+      "confidence": "verified_direct_attribution"
+    }
+  ]
+}
