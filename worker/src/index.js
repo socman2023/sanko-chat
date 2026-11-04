@@ -15,7 +15,7 @@ import { enforceMandatorySankoForms,literaryEquivalentsInSankoSpeech } from "./s
 import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.6.4";
+const VERSION="sanko-worker-0.6.5";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
