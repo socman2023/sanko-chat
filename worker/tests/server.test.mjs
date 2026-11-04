@@ -704,3 +704,19 @@ test("real Sanko chat does not append decorative тута after a flight",async(
   assert.equal((await r.json()).reply,"Еле удрали!");
  }finally{globalThis.fetch=original;}
 });
+
+test("live conversation contract removes invented official and mistaken person ending",async()=>{
+ const {env}=envStub(),original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({
+  candidates:[{finishReason:"STOP",content:{parts:[
+   {text:"Купчик на нас донес, будто мы его обмануть хошь. Чинуша со стражей заявился, ну мы и дали деру."}
+  ]}}]
+ }),{status:200});
+ try{
+  const r=await worker.fetch(req("А почему за вами погнались?"),env,ctx);
+  assert.equal(r.status,200);
+  const result=await r.json();
+  assert.equal(result.reply,
+   "Купчик на нас донес, будто мы его обмануть хотели. Стража явилась, ну мы и дали деру.");
+ }finally{globalThis.fetch=original;}
+});
