@@ -2,7 +2,7 @@
 // Internal error codes may be logged or used to decide UI behavior.
 export const SANKO_NOTICES=Object.freeze({
  provider_quota:"Не выходит нынче поговорить. Ты чуть погодя загляни, ладно?",
- provider_busy:"Не выходит поговорить. Загляни погодя, ладно?",
+ provider_busy:"Не выходит поговорить. Ты загляни погодя, ладно?",
  service_unavailable:"Связь не ладится. Ты загляни погодя, ладно?",
  response_blocked:"Не стану говорить. Давай лучше о другом?",
 });
