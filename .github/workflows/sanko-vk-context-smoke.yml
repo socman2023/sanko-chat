@@ -38,6 +38,7 @@ jobs:
           node --input-type=module <<'NODE'
           const { lintSankoReply } = await import("./quality/sanko/check_reply.mjs");
           const url="https://sanko-chat-api.boysinger2008.workers.dev/api/chat";
+          const conversationId=crypto.randomUUID();
           const response=await fetch(url,{
             method:"POST",
             headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
@@ -45,7 +46,7 @@ jobs:
               message:"То же, что и у тебя.",
               openingGreeting:"О, Княжич! Здрав будь. Шо у тебя нового?",
               history:[],
-              conversationId:crypto.randomUUID()
+              conversationId
             })
           });
           const data=await response.json();
@@ -61,4 +62,27 @@ jobs:
             throw Error("Reply is a copied canonical quotation unrelated to first greeting");
           if(/куды мы нынче пой|куда мы сейчас пой|ты в энтой стороне забыл|про дело, а ты шутки|энто мы завсегда успеем/iu.test(reply))
             throw Error("First reply derailed into an imagined errand or journey");
+          if(/(?:^|[^\p{L}])(?:покудь|досильно|уречно)(?=$|[^\p{L}])/iu.test(reply))
+            throw Error("Incomprehensible invented dialect in first reply");
+          // Real, consecutive follow-up: a complaint about clarity must be
+          // answered without staged dialogue or a new invented adventure.
+          const question2="Чего? Не понял. Скажи проще.";
+          const second=await fetch(url,{
+            method:"POST",
+            headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
+            body:JSON.stringify({message:question2,conversationId,
+              history:[{role:"user",text:"То же, что и у тебя."},
+                {role:"model",text:reply}]})
+          });
+          const next=await second.json();
+          const explanation=String(next.reply||"");
+          console.log(JSON.stringify({turn:2,http:second.status,
+            model:next.model,reply:explanation},null,2));
+          if(!second.ok||!explanation.trim())throw Error("Sanko clarification unavailable");
+          if(explanation.split(/\s+/u).filter(Boolean).length>38)
+            throw Error("Sanko clarification is too long");
+          if(lintSankoReply(explanation).length)
+            throw Error("Mandatory dialect or calendar violated in clarification");
+          if(/(?:^|[^\p{L}])(?:покудь|досильно|уречно)(?=$|[^\p{L}])/iu.test(explanation))
+            throw Error("Invented Sanko word in clarification");
           NODE
