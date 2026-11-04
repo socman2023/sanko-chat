@@ -17,7 +17,7 @@ import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
 
-const VERSION="sanko-worker-0.6.7";
+const VERSION="sanko-worker-0.6.8";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -365,8 +365,8 @@ async function geminiAttempt(env,model,timeout,system,contents,outputLimit=4096,
   return {ok:false,retryable:true,kind:"provider_busy"};
  }
 }
-async function answerWithGemini(env,system,history,question) {
- const contents=primeWithSankoExamples(history,question);
+async function answerWithGemini(env,system,history,question,skipExamples=false) {
+ const contents=primeWithSankoExamples(history,question,{skipExamples});
  let fallback=false,lastKind="provider_busy",anyQuota=false;
  const attempts=[];
  for(const [model,timeout] of modelList(env)) {
@@ -450,8 +450,9 @@ async function chat(req,env,origin,ctx) {
   if(hits.length>=12)break;
  }
  const diary=await loadPublishedDiary(env,scope,question);
- const system=systemText(runtime,scope,hits,today,diary)+openingConversationCue(body?.openingGreeting,history);
- const generated=await answerWithGemini(env,system,history,question);
+ const openingCue=openingConversationCue(body?.openingGreeting,history);
+ const system=systemText(runtime,scope,hits,today,diary)+openingCue;
+ const generated=await answerWithGemini(env,system,history,question,Boolean(openingCue));
  await recordUsage(env,admission.id,generated.attempts);
  if(!generated.ok) {
   await storeTurn(env,id,admission.id,question,"","","error");
