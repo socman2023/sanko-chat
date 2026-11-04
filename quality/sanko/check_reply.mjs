@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 const dir=dirname(fileURLToPath(import.meta.url));
 export const contract=JSON.parse(readFileSync(join(dir,"voice_contract.json"),"utf8"));
 const escapeRe=s=>Array.from(s).map(c=>"|\\{}()[\\]^$+*?.".includes(c)?"\\"+c:c).join("");
-const whole=s=>new RegExp("(?<![\\p{L}\\p{N}])"+escapeRe(s)+"(?![\\p{L}\\p{N}])","giu");
+const whole=s=>new RegExp("(?<![\\p{L}\\p{N}-])"+escapeRe(s)+"(?![\\p{L}\\p{N}-])","giu");
 const rules=contract.mandatoryLexemes.map(x=>({source:x.standard,required:x.required,re:whole(x.standard)}));
 const noCalendar=/(?<![\p{L}\p{N}])(?:(?:19|20)\d{2}|\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?|январ[яьеюём]|феврал[яьеюём]|март[аеуом]?|апрел[яьеюём]|ма[йяюе]|июн[яьеюём]|июл[яьеюём]|август[аеуом]?|сентябр[яьеюём]|октябр[яьеюём]|ноябр[яьеюём]|декабр[яьеюём]|понедельник[аеуом]?|вторник[аеуом]?|сред[аеуыой]?|четверг[аеуом]?|пятниц[аыеуой]?|суббот[аыеуой]?|воскресень[яеюем]?)(?![\p{L}\p{N}])/iu;
 const bannedPhrases=[
