@@ -82,15 +82,17 @@ export async function classifySankoVkVisitor(verifiedUserId,env,{fetchFn=fetch}=
  const cfg=tokenConfig(env);
  if(!cfg)return {role:"stranger",roleChecked:false};
 
- const friends=await cachedIds(env,"friends",cfg.owner,cfg.token,fetchFn);
+ // Run independent VK calls concurrently so session initialization stays
+ // within the 6.5-second client timeout. Keep ranking after all settle.
+ const [friends,followers,community]=await Promise.all([
+  cachedIds(env,"friends",cfg.owner,cfg.token,fetchFn),
+  cachedIds(env,"followers",cfg.owner,cfg.token,fetchFn),
+  memberOfCommunity(env,Number(verifiedUserId),cfg.token,fetchFn)
+ ]);
  if(friends.ok&&friends.ids.has(Number(verifiedUserId)))
   return {role:"friend",roleChecked:true};
-
- const followers=await cachedIds(env,"followers",cfg.owner,cfg.token,fetchFn);
  if(followers.ok&&followers.ids.has(Number(verifiedUserId)))
   return {role:"follower",roleChecked:true};
-
- const community=await memberOfCommunity(env,Number(verifiedUserId),cfg.token,fetchFn);
  if(community.ok&&community.isMember)
   return {role:"community",roleChecked:true};
 
