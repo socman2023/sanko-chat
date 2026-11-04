@@ -11,17 +11,15 @@ export const SANKO_SPEECH_EXAMPLES=[
  {cue:"Надо бы на это поглядеть.",reply:"Надо посмотреть."}
 ];
 
-// The sample turns are prepended before true chat history, and MUST NEVER
-// be saved as messages or passed to the user's conversation history.
-export function primeWithSankoExamples(history,question,{skipExamples=false}={}) {
- // The FIRST user reply may refer to the actual on-screen greeting.
- // Do not place fictional example conversations before that reply.
- // The artificial exchanges could displace its context.
- const examples=skipExamples?[]:SANKO_SPEECH_EXAMPLES.flatMap(x=>[
-  {role:"user",parts:[{text:"[Только образец манеры речи, не настоящее событие] "+x.cue}]},
-  {role:"model",parts:[{text:x.reply}]}
- ]);
- const real=history.map(x=>({role:x.role==="model"?"model":"user",parts:[{text:x.text}]}));
+// Genuine quotations stay available as voice references in sanko-voice.js.
+// Do NOT insert synthetic user/model exchanges ahead of actual conversation:
+// the model treats them as previous dialogue, then imitates their structure
+// or mistakes their artificial cues for an episode it has lived through.
+// This builder sends ONLY the user's real conversation to Gemini.
+export function buildSankoConversation(history,question) {
+ const real=history.map(x=>({
+  role:x.role==="model"?"model":"user",parts:[{text:x.text}]
+ }));
  real.push({role:"user",parts:[{text:question}]});
- return [...examples,...real];
+ return real;
 }
