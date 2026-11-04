@@ -801,10 +801,11 @@ test("invalid VK launch never obtains a friend or follower status",async()=>{
 
 test("first answer receives the actually displayed Sanko greeting as contextual cue",async()=>{
  const {env}=envStub(),old=globalThis.fetch;
- const instructions=[];
+ const instructions=[],contents=[];
  globalThis.fetch=async(url,init)=>{
   const reqBody=JSON.parse(init.body);
   instructions.push(reqBody.systemInstruction.parts[0].text);
+  contents.push(reqBody.contents);
   return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{
    parts:[{text:"Да сам не знаю, шо нового. Сидим покуда тута."}]
   }}]}),{status:200});
@@ -821,11 +822,14 @@ test("first answer receives the actually displayed Sanko greeting as contextual 
   assert.match(instructions[0],/НАЧАЛО ЭТОЙ БЕСЕДЫ/);
   assert.match(instructions[0],/Ты только что обратился к собеседнику так: «Здрав будь\. Шо у тебя нового\?»/);
   assert(!instructions[0].includes("О, Княжич!"),"client name never becomes trusted fact");
+  assert.deepEqual(contents[0],[{role:"user",parts:[{text:"То же, шо и у тебя."}]}],
+   "first answer cannot be distracted by six staged user/model exchanges");
   const two=await call([
    {role:"user",text:"Здрав будь!"},
    {role:"model",text:"Здрав будь, брат."}
   ],"О, Княжич! Здрав будь. Шо у тебя нового?");
   assert.equal(two.status,200);
+  assert(contents[1].length>3,"later turns may keep canonical speech examples");
   assert(!instructions[1].includes("НАЧАЛО ЭТОЙ БЕСЕДЫ"),
    "later turns rely on real history, not stale on-screen opening");
  }finally{globalThis.fetch=old;}

@@ -13,8 +13,11 @@ export const SANKO_SPEECH_EXAMPLES=[
 
 // The sample turns are prepended before true chat history, and MUST NEVER
 // be saved as messages or passed to the user's conversation history.
-export function primeWithSankoExamples(history,question) {
- const examples=SANKO_SPEECH_EXAMPLES.flatMap(x=>[
+export function primeWithSankoExamples(history,question,{skipExamples=false}={}) {
+ // The FIRST user reply may refer to the actual on-screen greeting.
+ // Do not place fictional example conversations before that reply.
+ // The artificial exchanges could displace its context.
+ const examples=skipExamples?[]:SANKO_SPEECH_EXAMPLES.flatMap(x=>[
   {role:"user",parts:[{text:"[Только образец манеры речи, не настоящее событие] "+x.cue}]},
   {role:"model",parts:[{text:x.reply}]}
  ]);
