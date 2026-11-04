@@ -14,8 +14,9 @@ import { guardSankoReply } from "./reply-guard.js";
 import { enforceMandatorySankoForms,literaryEquivalentsInSankoSpeech } from "./sanko-mandatory-forms.js";
 import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
+import { classifySankoVkVisitor } from "./vk-relationships.js";
 
-const VERSION="sanko-worker-0.6.5";
+const VERSION="sanko-worker-0.6.6";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -407,8 +408,13 @@ async function session(req,env,origin) {
  const name=verified&&Number(input.vkFirstNameUserId)===verified.uid&&
    typeof input.vkFirstName==="string"&&/^[\p{L}\p{M} -]{2,45}$/u.test(input.vkFirstName)
    ?input.vkFirstName.trim():"";
- // Sanko must not inherit Oleshka's VK friend or follower relationships.
- return respond({role:"stranger",verified:!!verified,firstName:name},200,origin,env);
+ // Only the signed VK user ID can be classified, using Sanko's OWN VK
+ // personal account lists. Never import Oleshka's relationships.
+ const relation=verified
+  ?await classifySankoVkVisitor(verified.uid,env)
+  :{role:"stranger",roleChecked:false};
+ return respond({role:relation.role,roleChecked:relation.roleChecked,
+  verified:!!verified,firstName:name},200,origin,env);
 }
 async function chat(req,env,origin,ctx) {
  if(!ready(env))return respond(publicChatError("service_unavailable"),503,origin,env);
