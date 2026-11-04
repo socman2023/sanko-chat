@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { classifySankoVkVisitor } from "../src/vk-relationships.js";
 
 const makeKV=()=>{
@@ -115,4 +116,16 @@ test("failed VK responses are not cached as valid empty friend lists",async()=>{
  const kv=makeKV(),api=apiMock({failure:"friends.get"});
  await classifySankoVkVisitor(87,env(kv),{fetchFn:api.fetchFn});
  assert(![...kv.data.keys()].some(x=>x.includes(":friends:")));
+});
+
+test("production configuration keeps Sanko's personal ID separate from Mini App ID",()=>{
+ const toml=readFileSync(new URL("../../wrangler.toml",import.meta.url),"utf8");
+ assert.match(toml,/^VK_APP_ID = "54875852"$/m);
+ assert.match(toml,/^VK_OWNER_USER_ID = "1029851985"$/m);
+ assert.match(toml,/^keep_vars = true$/m);
+ assert.doesNotMatch(toml,/^VK_(?:SERVICE_TOKEN|APP_SECRET)\s*=/m,
+  "Secrets belong exclusively to Cloudflare");
+ const cfg=env(makeKV(),{VK_OWNER_USER_ID:"1029851985"});
+ assert.equal(cfg.VK_OWNER_USER_ID,"1029851985");
+ assert.notEqual(cfg.VK_OWNER_USER_ID,cfg.VK_APP_ID);
 });
