@@ -851,8 +851,8 @@ async function signedVkLaunchForDialogue(uid,env) {
   {name:"HMAC",hash:"SHA-256"},false,["sign"]);
  const digest=new Uint8Array(await crypto.subtle.sign("HMAC",key,
   new TextEncoder().encode(new URLSearchParams(ordered).toString())));
- const signature=btoa(String.fromCharCode(...digest)).replace(/\\+/g,"-")
-  .replace(/\\//g,"_").replace(/=+$/,"");
+ const signature=btoa(String.fromCharCode(...digest)).replace(/\+/g,"-")
+  .replace(/\//g,"_").replace(/=+$/,"");
  params.set("sign",signature);
  return "?"+params.toString();
 }
