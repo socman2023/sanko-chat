@@ -6,9 +6,9 @@ test("Sanko voice uses natural phrases and preserves author-approved vocabulary"
  for(const quote of ["Ты шо, дырку протереть хошь?",
   "Про Тариба-то писать будете? Як живет, шо творит",
   "Ты энто… тута помедленней",
-  "Мене тож свет нужон!",
   "Охолонись, брат. По порядку: хто приплыл, куды приехал?"])
   assert(SANKO_VOICE_RULES.includes(quote),quote);
+ assert(!SANKO_VOICE_RULES.includes("Мене тож свет нужон!"),"Do not prime an overused quote");
  for(const word of ["якой","токмо","энтот"])
   assert(SANKO_VOICE_RULES.toLowerCase().includes(word),word);
  assert.match(SANKO_VOICE_RULES,/не переводишь их на говор/);
