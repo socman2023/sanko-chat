@@ -10,7 +10,7 @@ test("Sanko voice uses natural phrases and preserves author-approved vocabulary"
   "Охолонись, брат. По порядку: хто приплыл, куды приехал?"])
   assert(SANKO_VOICE_RULES.includes(quote),quote);
  for(const word of ["якой","токмо","энтот"])
-  assert(SANKO_VOICE_RULES.includes(word),word);
+  assert(SANKO_VOICE_RULES.toLowerCase().includes(word),word);
  assert.match(SANKO_VOICE_RULES,/не переводишь их на говор/);
  assert.match(SANKO_VOICE_RULES,/Никакого нарочитого коверкания слов/);
 });

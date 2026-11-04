@@ -100,9 +100,9 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert.match(instructions,/одна или две короткие фразы/);
   assert.match(instructions,/примерно 8–30 слов/);
   assert.match(instructions,/Говор у тебя свой, привычный с детства/);
-  assert.match(instructions,/Твои привычные живые словечки и формы/);
+  assert.match(instructions,/ОБЯЗАТЕЛЬНЫЙ ЗАКОН ТВОЕЙ РЕЧИ — ВСЕГДА/);
   for(const word of ["шо","як","якой","токмо","тока","энто","энтот","ежли","тута","хто","куды"])
-   assert(instructions.includes(word),"Missing canon/author-approved form: "+word);
+   assert(instructions.toLowerCase().includes(word),"Missing canon/author-approved form: "+word);
   assert.match(instructions,/Ты шо, дырку протереть хошь/);
   assert.match(instructions,/Про Тариба-то писать будете\? Як живет, шо творит/);
   assert(!instructions.includes("Слова «шо», «анэ», «зело» допустимы в подходящей ситуации, иногда в шутку"));
@@ -269,7 +269,7 @@ test("model fallback after 429: primary overloaded, first reserve succeeds",asyn
   const data=await response.json();
   assert.equal(data.model,"gemini-3.1-flash-lite");
   assert.equal(data.fallbackUsed,true);
-  assert.equal(data.reply,"Я тут. Скажи, чего хотел?");
+  assert.equal(data.reply,"Я тута. Скажи, чего хотел?");
   assert.deepEqual(calls.map(x=>x.model),["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
   assert.deepEqual(calls[0].body.systemInstruction,calls[1].body.systemInstruction);
   assert.deepEqual(calls[0].body.contents,calls[1].body.contents);
@@ -572,7 +572,7 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(system.includes("Как разговаривает Санко"));
   assert(system.includes("Ты Санко, славонский мальчишка"));
   assert(system.includes("Перед ответом проверь"));
-  assert(system.includes("«энто» или «шо»"));
+  assert(system.includes("ВО ВСЕХ собственных репликах употребляй обязательные формы"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
  }finally{globalThis.fetch=old;}
 });
@@ -639,4 +639,38 @@ test("Sanko sends authentic speech examples BEFORE real history without a second
   assert.equal(requests[0].generationConfig.temperature,0.4);
   assert.equal(observed.usageInserts.length,1);
  }finally{globalThis.fetch=old;}
+});
+
+
+test("live chat normalizes all approved Sanko words before reply and storage",async()=>{
+ const {env,observed}=envStub();
+ const before=globalThis.fetch;let calls=0;
+ const raw="Что это? Какой выбор? Только если кто там. Куда и как? Этот тут, а меня здесь нет. Мне этих людей каждый день видеть? Хочешь?";
+ const expected="Шо энто? Якой выбор? Тока ежли хто тама. Куды и як? Энтот тута, а мя тута нема. Мене энтих людей кажный день видеть? Хошь?";
+ globalThis.fetch=async()=>{
+  calls++;
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:raw}]}}],
+   usageMetadata:{promptTokenCount:100,candidatesTokenCount:48,totalTokenCount:148}}),{status:200});
+ };
+ try{
+  const r=await worker.fetch(req("Санко, чего скажешь?"),env,ctx);
+  assert.equal(r.status,200);
+  const data=await r.json();
+  assert.equal(data.reply,expected);
+  assert.equal(calls,1,"No additional calls, Free Tier preserved");
+  assert.equal(observed.usageInserts.length,1);
+  assert.equal(observed.usageInserts[0].values[9],148);
+ }finally{globalThis.fetch=before;}
+});
+
+test("a single next-turn reply must not regress to literary pronouns",async()=>{
+ const {env}=envStub(),original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[
+  {text:"Ну, здрав будь. Как у тебя дела? Это я только спросить хотел."}
+ ]}}]}),{status:200});
+ try{
+  const r=await worker.fetch(req("Привет, Санко!"),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal((await r.json()).reply,"Ну, здрав будь. Як у тебя дела? Энто я тока спросить хотел.");
+ }finally{globalThis.fetch=original;}
 });

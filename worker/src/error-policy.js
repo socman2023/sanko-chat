@@ -2,9 +2,9 @@
 // Internal error codes may be logged or used to decide UI behavior.
 export const SANKO_NOTICES=Object.freeze({
  provider_quota:"Не выходит нынче поговорить. Ты чуть погодя загляни, ладно?",
- provider_busy:"Что-то разговор не ладится. Ты позже загляни, ладно?",
- service_unavailable:"Что-то связь не идёт. Загляни попозже, ладно?",
- response_blocked:"Про это мне сейчас не ответить. Давай о другом?",
+ provider_busy:"Не выходит поговорить. Ты загляни погодя, ладно?",
+ service_unavailable:"Связь не ладится. Ты загляни погодя, ладно?",
+ response_blocked:"Не стану говорить. Давай лучше о другом?",
 });
 export function classifyProviderError(status,data){
  const code=String(data?.error?.status||"").toUpperCase();
