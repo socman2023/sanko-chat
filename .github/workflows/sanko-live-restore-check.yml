@@ -98,7 +98,7 @@ jobs:
             throw Error("Author-corrected awkward Sanko phrasing reappeared");
            if(/чинуш|чинот|далебени|сполохом\s+(?:им\s+)?глаза|доступным\s+записям/iu.test(reply))
             throw Error("Character leaked generic / ungrounded construction");
-           if(/мене\\s+тож\\s+свет\\s+нужон/iu.test(reply))
+           if(/мене\s+тож\s+свет\s+нужон/iu.test(reply))
             throw Error("Overused light catchphrase repeated in unrelated conversation");
            const lexicalIssues=lintSankoReply(reply);
            if(lexicalIssues.length)throw Error("Sanko always-on words violated: "+JSON.stringify(lexicalIssues));
