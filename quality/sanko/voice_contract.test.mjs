@@ -8,14 +8,15 @@ const dir=dirname(fileURLToPath(import.meta.url));
 const src=JSON.parse(readFileSync(join(dir,"source_quotes.json"),"utf8"));
 const evals=JSON.parse(readFileSync(join(dir,"eval_cases.json"),"utf8"));
 
-test("author-approved forms ALWAYS, with no optional mode",()=>{
- assert.equal(contract.mandatoryLexemes.length,18);
+test("all author-approved forms ALWAYS, with no optional mode",()=>{
+ assert.equal(contract.mandatoryLexemes.length,25);
  assert(contract.globalRule.includes("ВСЕГДА"));
  assert(contract.mandatoryLexemes.every(x=>x.mode==="ALWAYS_WHEN_MEANING_IS_USED_IN_OWN_SPEECH"));
  for(const [standard,form] of [
   ["что","шо"],["это","энто"],["как","як"],["какой","якой"],
   ["только","токмо"],["этот","энтот"],["если","ежли"],
-  ["кто","хто"],["куда","куды"]
+  ["кто","хто"],["куда","куды"],["после","опосля"],["до сих пор","досель"],
+  ["сюда","сюды"],["туда","туды"],["пока","покуда"],["дотуда","дотуль"]
  ]) {
   const entry=contract.mandatoryLexemes.find(x=>x.standard===standard);
   assert(entry,"Missing mandatory "+standard);
@@ -82,6 +83,6 @@ test("benchmark checks complete dialogue, without frozen facts",()=>{
  assert(evals.cases.length>=25);
  assert(evals.cases.filter(x=>x.category==="recent").length>=4);
  assert(evals.cases.filter(x=>x.category==="followup").length>=3);
- assert(evals.cases.every(x=>x.lexicalContract==="zero_literary_equivalents_of_mandatory_18"));
+ assert(evals.cases.every(x=>x.lexicalContract==="zero_literary_equivalents_of_mandatory_25"));
  assert(evals.cases.every(x=>x.dates==="no_calendar_dates"));
 });
