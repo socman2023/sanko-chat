@@ -26,6 +26,15 @@ export function smoothSankoSpeech(value) {
   /(?<![\p{L}\p{N}])(мы\s+его\s+обмануть)\s+хошь(?=[\s.!?,;:]|$)/giu,
   "$1 хотели"
  );
+ // In "Плывём опосля по реке" the time word has no antecedent and
+ // interrupts a present-tense description of where the boat is moving.
+ // Remove ONLY this confirmed malformed construction. Legitimate "опосля
+ // ужина", "мы сами опосля заскочим" and other time uses stay untouched.
+ reply=reply.replace(
+  /(?<![\p{L}\p{N}])(плыв(?:ём|ем|у|ут))\s+опосля(?=\s+по\s+реке\b)/giu,
+  "$1"
+ );
+
  // «Покуда» is temporal, not a natural one-word goodbye.
  // Avoid turning a modern parting «Пока!» into «Покуда!».
  reply=reply.replace(/^\s*(?:Ну,?\s*)?Пока[.!\s]*$/iu,"Бывай!");
