@@ -17,11 +17,22 @@ test("Sanko voice uses natural phrases and preserves author-approved vocabulary"
 test("Sanko never speaks calendar dates or the diary bookkeeping",()=>{
  assert.match(SANKO_VOICE_RULES,/Никогда не называй календарные даты/);
  assert.match(SANKO_VOICE_RULES,/даже если человек прямо спрашивает/);
- assert.match(SANKO_VOICE_REMINDER,/НИКАКИХ календарных дат/);
+ assert.match(SANKO_VOICE_REMINDER,/Календарные даты/);
  assert.match(SANKO_VOICE_RULES,/Не говори «за энту дату»/);
 });
 test("Sanko remains brief unless more detail is requested",()=>{
  assert.match(SANKO_VOICE_RULES,/8–30 слов/);
- assert.match(SANKO_VOICE_REMINDER,/8–30 слов/);
+ assert.match(SANKO_VOICE_REMINDER,/коротко и грамматически связно/);
  assert.match(SANKO_VOICE_RULES,/Если прямо попросили подробно/);
+});
+
+test("new clarity rules preserve mandatory dialect without producing gibberish",()=>{
+ assert.match(SANKO_VOICE_RULES,/Самое важное — понятный ответ/);
+ assert.match(SANKO_VOICE_RULES,/покуда.*время|покуда.*времени/iu);
+ assert.match(SANKO_VOICE_RULES,/«дотуль» \(предел пути\)/u);
+ assert.match(SANKO_VOICE_RULES,/Не создавай формы «покудь», «досильно», «уречно»/);
+ assert.match(SANKO_VOICE_RULES,/не понял/iu);
+ assert.match(SANKO_VOICE_REMINDER,/не вставляй диалектные слова ради количества/);
+ assert(!SANKO_VOICE_REMINDER.includes("ВО ВСЕХ собственных репликах"),
+  "Don't pressure Sanko to pile on stylistic words in every reply");
 });
