@@ -16,7 +16,7 @@ export function repairSankoLexicalClarification(reply,question,history=[]) {
  if(word("опосля").test(request)&&Array.isArray(history)){
   const previous=[...history].reverse().find(x=>x?.role==="model")?.text||"";
   const first=String(previous).split(/[.!?]/u)[0].trim();
-  if(/(?<![\p{L}\p{N}])плыв(?:ём|ем|у|ут)\s+опосля\s+по\s+реке\b/iu.test(first) &&
+  if(/(?<![\p{L}\p{N}])плыв(?:ём|ем|у|ут)\s+опосля\s+по\s+реке(?![\p{L}\p{N}])/iu.test(first) &&
      first.length>0 && first.length<=140){
    const cleaned=smoothSankoSpeech(first);
    return "Лишнее слово вставил. "+cleaned.replace(/[.!?]+$/u,"")+".";
