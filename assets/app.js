@@ -55,8 +55,16 @@
   }
   function greeting() {
     const text = GREETINGS[greetingId - 1] || GREETINGS[0];
+    // A name is shown only after /api/session confirms a signed VK launch.
+    // This is a personal greeting, not an invented memory of prior chats.
     if (visitorRole === 'friend' && visitorName) {
-      return 'Здрав будь, ' + visitorName + '! ' + text.replace(/^Здрав будь[.! ]*/u, '');
+      return 'О, ' + visitorName + '! Здрав будь. Шо у тебя нового?';
+    }
+    if (visitorRole === 'follower' && visitorName) {
+      return 'Здрав будь, ' + visitorName + '! Шо тебе рассказать?';
+    }
+    if (visitorRole === 'community' && visitorName) {
+      return 'Здрав будь, ' + visitorName + '! Шо спросить хотел?';
     }
     return text;
   }
