@@ -613,8 +613,8 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(system.includes("Не повторяй всю последовательность приключений"));
   assert(system.includes("Как разговаривает Санко"));
   assert(system.includes("Ты Санко, славонский мальчишка"));
-  assert(system.includes("Перед ответом проверь"));
-  assert(system.includes("ВО ВСЕХ собственных репликах употребляй обязательные формы"));
+  assert(system.includes("СНАЧАЛА скажи понятную мысль"));
+  assert(system.includes("Если нужное значение есть в авторском перечне"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
  }finally{globalThis.fetch=old;}
 });
