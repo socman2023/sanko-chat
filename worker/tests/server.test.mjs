@@ -100,7 +100,7 @@ test("successful reply isolates profile, Vectorize and date",async()=>{
   assert.match(instructions,/одна или две короткие фразы/);
   assert.match(instructions,/примерно 8–30 слов/);
   assert.match(instructions,/Говор у тебя свой, привычный с детства/);
-  assert.match(instructions,/ОБЯЗАТЕЛЬНЫЙ ЗАКОН ТВОЕЙ РЕЧИ — ВСЕГДА/);
+  assert.match(instructions,/ОБЯЗАТЕЛЬНО ДЛЯ СОБСТВЕННОЙ РЕЧИ/);
   for(const word of ["шо","як","якой","токмо","тока","энто","энтот","ежли","тута","хто","куды"])
    assert(instructions.toLowerCase().includes(word),"Missing canon/author-approved form: "+word);
   assert.match(instructions,/Ты шо, дырку протереть хошь/);
@@ -613,8 +613,8 @@ test("Sanko uses short default replies while retaining dialect and detailed-on-r
   assert(system.includes("Не повторяй всю последовательность приключений"));
   assert(system.includes("Как разговаривает Санко"));
   assert(system.includes("Ты Санко, славонский мальчишка"));
-  assert(system.includes("Перед ответом проверь"));
-  assert(system.includes("ВО ВСЕХ собственных репликах употребляй обязательные формы"));
+  assert(system.includes("СНАЧАЛА скажи понятную мысль"));
+  assert(system.includes("Если нужное значение есть в авторском перечне"));
   assert(!system.includes("не вставляй «шо» и «як» нарочно"));
  }finally{globalThis.fetch=old;}
 });
@@ -659,7 +659,7 @@ test("a naturally short Sanko reply causes no extra token-consuming rewrite",asy
 });
 
 
-test("Sanko sends authentic speech examples BEFORE real history without a second model request",async()=>{
+test("Sanko sends ONLY real conversation turns; canonical quotes stay in the system voice profile",async()=>{
  const {env,observed}=envStub();
  const old=globalThis.fetch,requests=[];
  globalThis.fetch=async(_,init)=>{
@@ -673,11 +673,10 @@ test("Sanko sends authentic speech examples BEFORE real history without a second
   assert.equal(r.status,200);
   assert.equal(requests.length,1,"No extra editorial Gemini calls");
   const contents=requests[0].contents;
-  assert.equal(contents[0].role,"user");
-  assert.match(contents[0].parts[0].text,/Только образец манеры речи/);
-  assert.equal(contents[1].role,"model");
-  assert.equal(contents[1].parts[0].text,"Ты шо, дырку протереть хошь?");
-  assert.equal(contents.at(-1).parts[0].text,"Ну расскажи шо-нибудь.");
+  assert.equal(contents.length,1,"Do not send synthetic exchanges to Gemini");
+  assert.deepEqual(contents[0],{role:"user",parts:[{text:"Ну расскажи шо-нибудь."}]});
+  assert(!JSON.stringify(contents).includes("Только образец манеры речи"));
+  assert.match(requests[0].systemInstruction.parts[0].text,/Ты шо, дырку протереть хошь/);
   assert.equal(requests[0].generationConfig.temperature,0.4);
   assert.equal(observed.usageInserts.length,1);
  }finally{globalThis.fetch=old;}
@@ -871,7 +870,11 @@ test("first answer receives the actually displayed Sanko greeting as contextual 
    {role:"model",text:"Здрав будь, брат."}
   ],"О, Княжич! Здрав будь. Шо у тебя нового?");
   assert.equal(two.status,200);
-  assert(contents[1].length>3,"later turns may keep canonical speech examples");
+  assert.equal(contents[1].length,3,"Later turns must contain two real turns and the newest question");
+  assert.deepEqual(contents[1].map(x=>x.parts[0].text),[
+   "Здрав будь!","Здрав будь, брат.","То же, шо и у тебя."
+  ]);
+  assert(!JSON.stringify(contents[1]).includes("Только образец манеры речи"));
   assert(!instructions[1].includes("НАЧАЛО ЭТОЙ БЕСЕДЫ"),
    "later turns rely on real history, not stale on-screen opening");
  }finally{globalThis.fetch=old;}
@@ -942,7 +945,7 @@ test("signed VK identity changes the WHO, not the dialect: Sanko knows Oleshka i
   assert.match(system,/Вопросы с известным ответом не задавай/);
   assert(!system.includes("Собеседник не находится рядом с тобой"));
   assert(!system.includes("«Мене тож свет нужон!»"));
-  assert.match(system,/ОБЯЗАТЕЛЬНЫЙ ЗАКОН ТВОЕЙ РЕЧИ — ВСЕГДА/);
+  assert.match(system,/ОБЯЗАТЕЛЬНО ДЛЯ СОБСТВЕННОЙ РЕЧИ/);
   const dialogue=captured[1].contents;
   assert(dialogue.some(x=>x.role==="user" && x.parts?.[0]?.text==="То же, что и у тебя"));
   assert(dialogue.some(x=>x.role==="model" && x.parts?.[0]?.text.includes("Ага, братец")));
@@ -981,5 +984,50 @@ test("unsigned nickname, forged VK launch and signed other user cannot pose as O
   const sessionData=await sessionResponse.json();
   assert.equal(sessionData.identity,"reader");
   assert.equal(sessionData.verified,false);
+ }finally{globalThis.fetch=original;}
+});
+
+
+test("full six-turn Sanko conversation preserves actual history and corrects unclear wording",async()=>{
+ const {env,observed}=envStub(),prompts=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  prompts.push(JSON.parse(init.body));
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Да, скажу проще. Я понял твой вопрос."}]}}]}),{status:200});
+ };
+ const transcript=[
+  "А у тебя?","Чего? Не понял.","А где твой отец?",
+  "Блин, что ты несёшь?","Скажи нормальными словами.",
+  "А теперь объясни, что ты хотел сказать."
+ ];
+ const history=[];
+ try{
+  for(const question of transcript){
+   const r=await worker.fetch(dialogueRequest(question,"",history),env,ctx);
+   assert.equal(r.status,200,question);
+   const data=await r.json();
+   assert.equal(typeof data.reply,"string");
+   history.push({role:"user",text:question},{role:"model",text:data.reply});
+  }
+  assert.equal(prompts.length,transcript.length,"Only one Gemini call per turn");
+  for(let i=0;i<prompts.length;i++){
+   const contents=prompts[i].contents;
+   assert.equal(contents.length,i*2+1,"No staged style dialogues on turn "+(i+1));
+   assert.deepEqual(contents.map(x=>x.role),[
+    ...Array.from({length:i},()=>["user","model"]).flat(),"user"
+   ]);
+   assert.equal(contents.at(-1).parts[0].text,transcript[i]);
+   assert(!JSON.stringify(contents).includes("Только образец манеры речи"));
+  }
+  for(const index of [1,3,4,5]){
+   assert.match(prompts[index].systemInstruction.parts[0].text,/Собеседник НЕ ПОНЯЛ/,
+    "Turn "+(index+1)+" must repair expression without new facts");
+  }
+  for(const index of [0,2]){
+   assert(!prompts[index].systemInstruction.parts[0].text.includes("Собеседник НЕ ПОНЯЛ"),
+    "Ordinary queries need no clarification cue");
+  }
+  assert.equal(observed.usageInserts.length,transcript.length);
  }finally{globalThis.fetch=original;}
 });

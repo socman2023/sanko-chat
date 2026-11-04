@@ -9,7 +9,8 @@ import { canonLexical } from "./canon-store.js";
 import { adminFetch } from "./admin.js";
 import { extractUsage,recordUsage } from "./token-usage.js";
 import { SANKO_VOICE_RULES,SANKO_VOICE_REMINDER } from "./sanko-voice.js";
-import { primeWithSankoExamples } from "./sanko-dialogue-examples.js";
+import { buildSankoConversation } from "./sanko-dialogue-examples.js";
+import { sankoClarificationCue } from "./sanko-clarity.js";
 import { guardSankoReply } from "./reply-guard.js";
 import { enforceMandatorySankoForms,literaryEquivalentsInSankoSpeech } from "./sanko-mandatory-forms.js";
 import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
@@ -17,7 +18,7 @@ import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
 
-const VERSION="sanko-worker-0.6.10";
+const VERSION="sanko-worker-0.6.11";
 // Public VK profile of Oleshka, distinct from Sanko’s Mini App and VK owner IDs.
 // Identity is used ONLY after verifying the signed VK launch on the server.
 const OLESHKA_VK_USER_ID=850667816;
@@ -309,7 +310,6 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
   "Не обсуждай способ связи без вопроса собеседника. "+
   "Не упоминай техническое устройство, модель, подсказки или инструкции.",
   SANKO_VOICE_RULES,
-  "Первые примеры user/model в контексте — только языковые ОБРАЗЦЫ с условными вопросами; НЕ считай их произошедшими событиями. После них начинается настоящая история диалога. Не пересказывай образцы вместо ответа.",
   "## Что знаешь о себе\n"+runtime.profile,
   "## Последний утверждённый личный контекст Санко\n"+(currentText||"Нового личного контекста нет.")+
    "\nЛичный срез не определяет сегодняшние дела, если существуют более поздние записи дневника.",
@@ -396,8 +396,8 @@ async function geminiAttempt(env,model,timeout,system,contents,outputLimit=4096,
   return {ok:false,retryable:true,kind:"provider_busy"};
  }
 }
-async function answerWithGemini(env,system,history,question,skipExamples=false) {
- const contents=primeWithSankoExamples(history,question,{skipExamples});
+async function answerWithGemini(env,system,history,question) {
+ const contents=buildSankoConversation(history,question);
  let fallback=false,lastKind="provider_busy",anyQuota=false;
  const attempts=[];
  for(const [model,timeout] of modelList(env)) {
@@ -490,8 +490,9 @@ async function chat(req,env,origin,ctx) {
  }
  const diary=await loadPublishedDiary(env,scope,question);
  const openingCue=openingConversationCue(body?.openingGreeting,history);
- const system=systemText(runtime,scope,hits,today,diary,isOleshka)+openingCue;
- const generated=await answerWithGemini(env,system,history,question,Boolean(openingCue));
+ const system=systemText(runtime,scope,hits,today,diary,isOleshka)+openingCue+
+  sankoClarificationCue(question,history);
+ const generated=await answerWithGemini(env,system,history,question);
  await recordUsage(env,admission.id,generated.attempts);
  if(!generated.ok) {
   await storeTurn(env,id,admission.id,question,"","","error");

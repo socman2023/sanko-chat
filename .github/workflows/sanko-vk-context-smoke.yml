@@ -24,13 +24,13 @@ jobs:
           set -eu
           for i in $(seq 1 18); do
             body="$(curl -fsS --max-time 9 https://sanko-chat-api.boysinger2008.workers.dev/health || true)"
-            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.10" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.11" and .diarySync.status=="ok"' >/dev/null 2>&1; then
               printf '%s' "$body" | jq '{version,diarySync}'
               exit 0
             fi
             sleep 8
           done
-          echo "New Worker v0.6.10 / diary not verified" >&2
+          echo "New Worker v0.6.11 / diary not verified" >&2
           exit 1
       - name: Test first reply referencing the actual VK greeting
         shell: bash
@@ -38,6 +38,7 @@ jobs:
           node --input-type=module <<'NODE'
           const { lintSankoReply } = await import("./quality/sanko/check_reply.mjs");
           const url="https://sanko-chat-api.boysinger2008.workers.dev/api/chat";
+          const conversationId=crypto.randomUUID();
           const response=await fetch(url,{
             method:"POST",
             headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
@@ -45,13 +46,13 @@ jobs:
               message:"То же, что и у тебя.",
               openingGreeting:"О, Княжич! Здрав будь. Шо у тебя нового?",
               history:[],
-              conversationId:crypto.randomUUID()
+              conversationId
             })
           });
           const data=await response.json();
           const reply=data.reply||"";
           console.log(JSON.stringify({http:response.status,
-            worker:"sanko-worker-0.6.10",
+            worker:"sanko-worker-0.6.11",
             model:data.model,reply,diaryPosts:data.knowledge?.diaryPosts},null,2));
           if(!response.ok||!reply.trim())throw Error("First reply unavailable");
           const words=reply.trim().split(/\s+/u).length;
@@ -61,4 +62,27 @@ jobs:
             throw Error("Reply is a copied canonical quotation unrelated to first greeting");
           if(/куды мы нынче пой|куда мы сейчас пой|ты в энтой стороне забыл|про дело, а ты шутки|энто мы завсегда успеем/iu.test(reply))
             throw Error("First reply derailed into an imagined errand or journey");
+          if(/(?:^|[^\p{L}])(?:покудь|досильно|уречно)(?=$|[^\p{L}])/iu.test(reply))
+            throw Error("Incomprehensible invented dialect in first reply");
+          // Real, consecutive follow-up: a complaint about clarity must be
+          // answered without staged dialogue or a new invented adventure.
+          const question2="Чего? Не понял. Скажи проще.";
+          const second=await fetch(url,{
+            method:"POST",
+            headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
+            body:JSON.stringify({message:question2,conversationId,
+              history:[{role:"user",text:"То же, что и у тебя."},
+                {role:"model",text:reply}]})
+          });
+          const next=await second.json();
+          const explanation=String(next.reply||"");
+          console.log(JSON.stringify({turn:2,http:second.status,
+            model:next.model,reply:explanation},null,2));
+          if(!second.ok||!explanation.trim())throw Error("Sanko clarification unavailable");
+          if(explanation.split(/\s+/u).filter(Boolean).length>38)
+            throw Error("Sanko clarification is too long");
+          if(lintSankoReply(explanation).length)
+            throw Error("Mandatory dialect or calendar violated in clarification");
+          if(/(?:^|[^\p{L}])(?:покудь|досильно|уречно)(?=$|[^\p{L}])/iu.test(explanation))
+            throw Error("Invented Sanko word in clarification");
           NODE
