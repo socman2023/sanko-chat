@@ -254,7 +254,7 @@
             ['friend', 'follower', 'community', 'stranger'].includes(result.role)) {
           visitorRole = result.role;
           if (typeof result.firstName === 'string') visitorName = result.firstName.slice(0, 45);
-          if (!conversation.some(m => m.role === 'user' || m.role === 'model')) render();
+          if (!busy && !conversation.some(m => m.role === 'user' || m.role === 'model')) render();
         }
       }
     } catch (_) { /* Never infer friends/followers from an unsigned response. */ }
