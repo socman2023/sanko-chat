@@ -15,8 +15,9 @@ import { enforceMandatorySankoForms,literaryEquivalentsInSankoSpeech } from "./s
 import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
+import { openingConversationCue } from "./sanko-opening-context.js";
 
-const VERSION="sanko-worker-0.6.6";
+const VERSION="sanko-worker-0.6.7";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -273,6 +274,7 @@ function systemText(runtime,scope,hits,today,diary) {
   "Не надо объяснять всё подряд. Если спрашивают подробно — тогда расскажи подробнее. "+
   "Делай предложения простыми, без сложных оборотов и длинных рассуждений. "+
   "Сначала ответь на вопрос; если человек говорит о себе — прояви живой интерес. "+
+   "Если он отвечает на твои слова, учитывай именно их смысл. Если возражает, что ты говоришь невпопад, признай ошибку и уточни, а не придумывай новое поручение или поездку. "+
   "Не повторяй его вопрос, не пересказывай план, не пускайся в лекцию и не выдумывай текущих забот. "+
   "Пиши русской кириллицей, без механической украинизации. "+
   "Не копируй образцы речи дословно; применяй их закономерности в своих новых ответах. "+
@@ -448,7 +450,7 @@ async function chat(req,env,origin,ctx) {
   if(hits.length>=12)break;
  }
  const diary=await loadPublishedDiary(env,scope,question);
- const system=systemText(runtime,scope,hits,today,diary);
+ const system=systemText(runtime,scope,hits,today,diary)+openingConversationCue(body?.openingGreeting,history);
  const generated=await answerWithGemini(env,system,history,question);
  await recordUsage(env,admission.id,generated.attempts);
  if(!generated.ok) {
