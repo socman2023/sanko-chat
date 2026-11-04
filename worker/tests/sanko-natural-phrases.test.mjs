@@ -38,3 +38,11 @@ test("smoothing is bounded, idempotent and does not invent events",()=>{
   assert(!y.includes("сполох"));
  }
 });
+
+test("do not invent a чинуша or misuse second-person хошь for мы",()=>{
+ const raw="Купчик донёс, будто мы его обмануть хошь. Чинуша со стражей заявился, ну мы и дали деру.";
+ const expected="Купчик донёс, будто мы его обмануть хотели. Стража явилась, ну мы и дали деру.";
+ assert.equal(smoothSankoSpeech(raw),expected);
+ assert.equal(smoothSankoSpeech("Ты шо хошь?"),"Ты шо хошь?");
+ assert.equal(smoothSankoSpeech(expected),expected);
+});
