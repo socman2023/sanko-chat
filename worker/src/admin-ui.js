@@ -156,6 +156,8 @@ table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:9px;borde
 .thread:hover,.thread[aria-pressed=true]{background:#e9eadc}.thread strong,.thread small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.thread small{font-size:12px;color:#66746c}
 .pages{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:14px}.pages span{font-size:13px}
 #transcript{max-height:72vh;overflow:auto}.turn{margin:0 0 23px}.turn p{font-size:13px;margin:2px 0;color:#6e766f}
+.attempt-list{font-size:12px;color:#42564a;background:#f0f2e9;border-left:3px solid #bda477;padding:8px 8px 8px 24px;margin:6px 0 13px;overflow-wrap:anywhere}
+.attempt-list li{margin:4px 0}
 .bubble{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px 14px;border-radius:9px;margin:6px 0}.user{background:#e7eee7}.model{background:#f5ead4}
 footer{margin-top:30px;font-size:13px;color:#6b7067}
 [hidden]{display:none!important}
@@ -257,6 +259,19 @@ export const ADMIN_SCRIPT = String.raw`
     item.append(el("div",x.question,"bubble user"));
     if(x.reply)item.append(el("div",x.reply,"bubble model"));
     if(!x.reply)item.append(el("p","Ответ не был получен ("+x.status+")."));
+    if(Array.isArray(x.attempts)&&x.attempts.length){
+     item.append(el("p","Попытки Gemini (время · модель · результат · токены):","hint"));
+     const list=el("ul",undefined,"attempt-list");
+     for(const a of x.attempts){
+      const tokens=a.totalTokens==null?"расход неизвестен":n(a.totalTokens)+" токенов";
+      list.append(el("li",when(a.attemptedAt)+" · "+a.model+" · "+a.result+" · "+tokens));
+     }
+     item.append(list);
+    } else if(x.status==="error"){
+     item.append(el("p",d.attemptsAvailable?
+      "Попытки Gemini не зарегистрированы: возможен локальный перерыв между обращениями или сбой до вызова модели.":
+      "Учёт попыток Gemini сейчас недоступен.","hint"));
+    }
     box.append(item);
    }
    if(!d.turns.length)box.append(el("p","В этой переписке больше нет записей.","hint"));

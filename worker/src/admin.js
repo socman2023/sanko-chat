@@ -124,15 +124,45 @@ async function conversations(req,env,body) {
 }
 async function thread(env,body) {
  if(!validUUID(body?.conversationId))return reply({error:"invalid_conversation_id"},400);
+ const from=cutoff();
  const rows=await env.GUARD_DB.prepare(
-  "SELECT id,asked_at AS askedAt,question,reply,model,status "+
+  "SELECT id,admission_id AS admissionId,asked_at AS askedAt,question,reply,model,status "+
   "FROM chat_turns WHERE conversation_id=? AND asked_at>=? ORDER BY id ASC LIMIT 1000"
- ).bind(body.conversationId,cutoff()).all();
- return reply({ok:true,conversationId:body.conversationId,
+ ).bind(body.conversationId,from).all();
+ // Join the existing per-attempt Gemini accounting to each saved chat turn.
+ // This also works for historic errors; no D1 migration or personal data is needed.
+ // A missing accounting table must not hide the conversation itself.
+ const byAdmission=new Map();
+ let attemptsAvailable=true;
+ try{
+  const attempts=await env.GUARD_DB.prepare(
+   "SELECT u.admission_id AS admissionId,u.attempted_at AS attemptedAt,"+
+   "u.model,u.result,u.total_tokens AS totalTokens "+
+   "FROM token_usage u JOIN chat_turns t ON t.admission_id=u.admission_id "+
+   "WHERE t.conversation_id=? AND t.asked_at>=? "+
+   "ORDER BY u.attempted_at ASC LIMIT 1000"
+  ).bind(body.conversationId,from).all();
+  for(const item of attempts?.results||[]){
+   const key=String(item.admissionId||"");
+   if(!key)continue;
+   if(!byAdmission.has(key))byAdmission.set(key,[]);
+   byAdmission.get(key).push({
+    attemptedAt:count(item.attemptedAt),
+    model:String(item.model||"неизвестна").slice(0,90),
+    result:String(item.result||"unknown").slice(0,40),
+    totalTokens:item.totalTokens==null?null:count(item.totalTokens)
+   });
+  }
+ }catch(err){
+  console.warn("Sanko per-turn Gemini accounting unavailable",err?.name||"unknown");
+  attemptsAvailable=false;
+ }
+ return reply({ok:true,conversationId:body.conversationId,attemptsAvailable,
   turns:(rows?.results||[]).map(x=>({
    id:count(x.id),askedAt:count(x.askedAt),
    question:String(x.question||""),reply:String(x.reply||""),
-   model:String(x.model||""),status:String(x.status||"")
+   model:String(x.model||""),status:String(x.status||""),
+   attempts:byAdmission.get(String(x.admissionId||""))||[]
   }))});
 }
 // GET pages are public, but expose no data. POST data requires auth.
