@@ -73,7 +73,14 @@ export const MANDATORY_SANKO_FORMS = [
  [
   "каждый",
   "кажный"
- ]
+ ],
+ ["после","опосля"],
+ ["до сих пор","досель"],
+ ["сюда","сюды"],
+ ["туда","туды"],
+ ["пока","покуда"],
+ ["дотуда","дотуль"],
+ ["до туда","дотуль"]
 ];
 
 // Whole Russian words, not substrings of names or hyphenated compounds.
@@ -82,7 +89,7 @@ export const MANDATORY_SANKO_FORMS = [
 const matchWord=s=>new RegExp("(?<![\\p{L}\\p{N}-])"+s+"(?![\\p{L}\\p{N}-])","giu");
 const compiled=MANDATORY_SANKO_FORMS.map(([standard,dialect])=>({
  standard,dialect,re:matchWord(standard)
-}));
+})).sort((a,b)=>b.standard.length-a.standard.length); // Multiword phrases before their constituent words.
 function preserveCase(original,replacement) {
  if(original===original.toUpperCase())return replacement.toUpperCase();
  if(original[0]===original[0].toUpperCase())
