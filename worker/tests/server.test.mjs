@@ -277,6 +277,48 @@ test("model fallback after 429: primary overloaded, first reserve succeeds",asyn
  }finally{globalThis.fetch=original;}
 });
 
+test("Gemini model-not-found (HTTP 404) falls back to the next configured model",async()=>{
+ const {env,observed}=envStub(),calls=[];
+ const previous=globalThis.fetch;
+ globalThis.fetch=async url=>{
+  const model=String(url).split("/models/")[1].split(":")[0];
+  calls.push(model);
+  if(calls.length===1)return new Response(JSON.stringify({error:{status:"NOT_FOUND"}}),{status:404});
+  return new Response(JSON.stringify({candidates:[{
+   finishReason:"STOP",content:{parts:[{text:"Здрав будь!"}]}
+  }]}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(req("Привет, Санко"),env,ctx);
+  assert.equal(response.status,200);
+  const answer=await response.json();
+  assert.equal(answer.model,"gemini-3.1-flash-lite");
+  assert.equal(answer.fallbackUsed,true);
+  assert.deepEqual(calls,["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
+  assert.equal(observed.usageInserts[0].values[4],"model_unavailable:404");
+  assert.equal(observed.usageInserts[1].values[4],"answered");
+  assert.equal(observed.insertions.length,1,"One message must use one admission");
+ }finally{globalThis.fetch=previous;}
+});
+test("Gemini invalid payload and access denial do not spend fallback calls",async()=>{
+ for(const httpStatus of [400,401,403]){
+  const {env,observed}=envStub();
+  let calls=0;
+  const previous=globalThis.fetch;
+  globalThis.fetch=async()=>{
+   calls++;
+   return new Response(JSON.stringify({error:{status:httpStatus===400?"INVALID_ARGUMENT":"PERMISSION_DENIED"}}),{status:httpStatus});
+  };
+  try{
+   const response=await worker.fetch(req("Здрав будь, Санко"),env,ctx);
+   assert.equal(response.status,503);
+   assert.equal((await response.json()).error,"service_unavailable");
+   assert.equal(calls,1,"Non-retryable HTTP "+httpStatus+" must not cascade");
+   assert.equal(observed.usageInserts[0].values[4],"service_unavailable:"+httpStatus);
+  }finally{globalThis.fetch=previous;}
+ }
+});
+
 test("fallback steps through transient error, empty and truncated replies to fourth model",async()=>{
  const {env,observed}=envStub();
  env.GEMINI_MODEL_ORDER="gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash";

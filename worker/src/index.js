@@ -17,7 +17,7 @@ import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
 
-const VERSION="sanko-worker-0.6.9";
+const VERSION="sanko-worker-0.6.10";
 // Public VK profile of Oleshka, distinct from Sanko’s Mini App and VK owner IDs.
 // Identity is used ONLY after verifying the signed VK launch on the server.
 const OLESHKA_VK_USER_ID=850667816;
@@ -407,8 +407,13 @@ async function answerWithGemini(env,system,history,question,skipExamples=false) 
    fallback=true;continue;
   }
   const result=await geminiAttempt(env,model,timeout,system,contents);
-  attempts.push({model,status:result.ok?"answered":result.kind||"provider_busy",
-   attemptedAt:Math.floor(Date.now()/1000),usage:result.usage||null});
+  // Preserve the HTTP code for failures in the existing token_usage.result
+  // string (<=40 characters); no new D1 table or migration is needed.
+  const kind=result.ok?"answered":result.kind||"provider_busy";
+  const status=!result.ok && Number.isInteger(result.httpStatus)
+   ?kind+":"+String(result.httpStatus):kind;
+  attempts.push({model,status,attemptedAt:Math.floor(Date.now()/1000),
+   usage:result.usage||null});
   if(result.ok)return {ok:true,reply:result.reply,model,fallbackUsed:fallback,attempts};
   lastKind=result.kind||"provider_busy";
   if(lastKind==="provider_quota")anyQuota=true;
