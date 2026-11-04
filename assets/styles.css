@@ -39,3 +39,34 @@ button:disabled,textarea:disabled{opacity:.56;cursor:not-allowed}.composer-note{
 @media(max-width:700px){body{background:#ebdfc6}.shell{display:block;width:100%;height:100dvh;min-height:0;margin:0;border:0;box-shadow:none}.side{display:none}.chat{height:100%;min-height:0}.chat:before{display:none}.topbar{min-height:77px;padding:10px 13px;gap:8px}.emblem{width:42px;height:42px;font-size:28px;box-shadow:0 0 0 2px #ead5ad,0 0 0 3px #ab986b}.top-identity{gap:11px}.kicker{font-size:11px;letter-spacing:.02em}.top-title{font-size:26px;margin-top:2px}.top-sub{font-size:12px}.new-chat{min-height:39px;padding:8px 10px;font-size:16px}.messages{padding:18px 13px 20px;gap:14px}.message{max-width:94%}.bubble{padding:13px 15px;font-size:20px}.composer-wrap{padding:11px 12px max(12px,env(safe-area-inset-bottom))}.composer textarea{min-height:48px;font-size:19px}.send{width:48px;height:48px}.composer-note{font-size:12px}}
 @media(max-width:360px){.topbar{padding:8px 10px}.top-title{font-size:23px}.top-sub{display:none}.kicker{font-size:10px}.emblem{width:36px;height:36px}.new-chat{font-size:14px;padding:8px}.new-chat span{display:none}.messages{padding:14px 10px}.bubble{font-size:19px}}
 @media(prefers-reduced-motion:no-preference){.bubble{animation:appear .17s ease-out}@keyframes appear{from{opacity:.55;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}}
+
+
+/* VK Mini App: VK desktop iframe and mobile WebView use a full-height,
+   chat-first layout. The ordinary standalone website is unchanged.
+   Bridge insets account for client panels; visualViewport accounts for the
+   virtual keyboard without locking the composer underneath it. */
+html.vk-embedded,html.vk-embedded body{height:100%;overflow:hidden}
+.vk-embedded body{background:var(--cream)}
+.vk-embedded .shell{display:block;width:100%;height:var(--vk-visible-height,100dvh);min-height:0;margin:0;border:0;box-shadow:none}
+.vk-embedded .side{display:none}
+.vk-embedded .chat{height:100%;min-height:0}
+.vk-embedded .topbar{
+ padding-top:max(10px,env(safe-area-inset-top,0px),var(--vk-inset-top,0px));
+ padding-right:max(13px,env(safe-area-inset-right,0px),var(--vk-inset-right,0px));
+ padding-left:max(13px,env(safe-area-inset-left,0px),var(--vk-inset-left,0px))
+}
+.vk-embedded .messages{
+ padding-right:max(13px,env(safe-area-inset-right,0px),var(--vk-inset-right,0px));
+ padding-left:max(13px,env(safe-area-inset-left,0px),var(--vk-inset-left,0px))
+}
+.vk-embedded .composer-wrap{
+ padding-right:max(12px,env(safe-area-inset-right,0px),var(--vk-inset-right,0px));
+ padding-left:max(12px,env(safe-area-inset-left,0px),var(--vk-inset-left,0px));
+ padding-bottom:max(12px,env(safe-area-inset-bottom,0px),var(--vk-inset-bottom,0px))
+}
+@media(max-height:450px){
+ .vk-embedded .topbar{min-height:52px;padding-top:5px;padding-bottom:5px}
+ .vk-embedded .kicker,.vk-embedded .top-sub,.vk-embedded .composer-note{display:none}
+ .vk-embedded .messages{padding-top:8px;padding-bottom:8px;gap:8px}
+ .vk-embedded .composer-wrap{padding-top:7px}
+}
