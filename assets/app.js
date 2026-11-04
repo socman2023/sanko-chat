@@ -30,6 +30,7 @@
   const send = el('send'), newButton = el('new-chat'), dialog = el('new-dialog');
   const confirmNew = el('confirm-new'), errorBox = el('error');
   let conversation = [], conversationId = '', greetingId = 0, focusDate = '';
+  let openingGreetingShown = '';
   let limitUntil = 0, busy = false, visitorRole = 'stranger', visitorName = '';
   let warnedPreview = false;
   let unlockTimer = 0;
@@ -121,7 +122,14 @@
   }
   function render() {
     messages.replaceChildren();
-    if (!conversation.some(m => m.role === 'user' || m.role === 'model')) bubble('model', greeting());
+    if (!conversation.some(m => m.role === 'user' || m.role === 'model')) {
+      // Keep the ACTUAL greeting that the user sees. The first message may
+      // answer its question, but greetings are not saved as chat history.
+      openingGreetingShown = greeting();
+      bubble('model', openingGreetingShown);
+    } else {
+      openingGreetingShown = '';
+    }
     conversation.forEach(m => bubble(m.role, m.text));
   }
   function resize() {
@@ -157,6 +165,11 @@
   }
   const vkLaunch = signedVkLaunch();
   const IN_VK = Boolean(vkLaunch);
+  function refocusAfterSend() {
+    // VK on desktop: preserve the typing flow; touch devices should not have
+    // their virtual keyboard unexpectedly reopened after a delayed reply.
+    return !IN_VK || window.matchMedia?.('(pointer: fine)')?.matches === true;
+  }
 
   function updateVkInsets(value) {
     if (!IN_VK || !value || typeof value !== 'object') return;
@@ -241,7 +254,7 @@
             ['friend', 'follower', 'community', 'stranger'].includes(result.role)) {
           visitorRole = result.role;
           if (typeof result.firstName === 'string') visitorName = result.firstName.slice(0, 45);
-          if (!conversation.some(m => m.role === 'user' || m.role === 'model')) render();
+          if (!busy && !conversation.some(m => m.role === 'user' || m.role === 'model')) render();
         }
       }
     } catch (_) { /* Never infer friends/followers from an unsigned response. */ }
@@ -270,6 +283,7 @@
     if (limitUntil) limitUntil = 0;
 
     const history = conversation.filter(m => m.role === 'user' || m.role === 'model').slice(-MAX_CONTEXT);
+    const openingGreeting = history.length ? '' : openingGreetingShown;
     const userNode = bubble('user', question);
     const pending = bubble('model', 'Пишет…', true);
     input.value = '';
@@ -281,7 +295,7 @@
       const response = await fetch(API, {
         method:'POST', headers:{'Content-Type':'application/json'}, signal:ctl.signal,
         body:JSON.stringify({message:question, history, focusDate, conversationId,
-          greetingId, vkLaunch, vkFirstName, vkFirstNameUserId})
+          openingGreeting, greetingId, vkLaunch, vkFirstName, vkFirstNameUserId})
       });
       // A non-JSON Cloudflare error must never expose HTML or a technical message.
       const data = await response.json().catch(() => null);
@@ -323,7 +337,7 @@
       clearTimeout(t);
       setBusy(false);
       applyLimitLock();
-      if (!input.disabled && !IN_VK) input.focus();
+      if (!input.disabled && refocusAfterSend()) input.focus();
     }
   });
   input.addEventListener('input', resize);
@@ -340,7 +354,7 @@
     if (!PREVIEW) { try { localStorage.removeItem(STORAGE_KEY); } catch (_) {} }
     save(); error(''); input.value=''; render(); resize();
     applyLimitLock();
-    if (!input.disabled && !IN_VK) input.focus();
+    if (!input.disabled && refocusAfterSend()) input.focus();
   }
   newButton.addEventListener('click', () => {
     if (busy) return;

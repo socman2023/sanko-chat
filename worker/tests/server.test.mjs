@@ -797,3 +797,36 @@ test("invalid VK launch never obtains a friend or follower status",async()=>{
   assert.equal(calls,0);
  }finally{globalThis.fetch=prev;}
 });
+
+
+test("first answer receives the actually displayed Sanko greeting as contextual cue",async()=>{
+ const {env}=envStub(),old=globalThis.fetch;
+ const instructions=[];
+ globalThis.fetch=async(url,init)=>{
+  const reqBody=JSON.parse(init.body);
+  instructions.push(reqBody.systemInstruction.parts[0].text);
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{
+   parts:[{text:"Да сам не знаю, шо нового. Сидим покуда тута."}]
+  }}]}),{status:200});
+ };
+ const call=(history,openingGreeting)=>worker.fetch(new Request(URL,{
+  method:"POST",
+  headers:{Origin:"https://socman2023.github.io","Content-Type":"application/json"},
+  body:JSON.stringify({message:"То же, шо и у тебя.",history,openingGreeting,
+   conversationId:"123e4567-e89b-42d3-a456-426614174000"})
+ }),env,ctx);
+ try {
+  const one=await call([],"О, Княжич! Здрав будь. Шо у тебя нового?");
+  assert.equal(one.status,200);
+  assert.match(instructions[0],/НАЧАЛО ЭТОЙ БЕСЕДЫ/);
+  assert.match(instructions[0],/Ты только что обратился к собеседнику так: «Здрав будь\. Шо у тебя нового\?»/);
+  assert(!instructions[0].includes("О, Княжич!"),"client name never becomes trusted fact");
+  const two=await call([
+   {role:"user",text:"Здрав будь!"},
+   {role:"model",text:"Здрав будь, брат."}
+  ],"О, Княжич! Здрав будь. Шо у тебя нового?");
+  assert.equal(two.status,200);
+  assert(!instructions[1].includes("НАЧАЛО ЭТОЙ БЕСЕДЫ"),
+   "later turns rely on real history, not stale on-screen opening");
+ }finally{globalThis.fetch=old;}
+});
