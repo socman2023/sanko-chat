@@ -27,3 +27,16 @@ test("real conversation stays intact and in order after exemplars",()=>{
  ]);
  assert.equal(history.length,2,"Never mutate actual user history");
 });
+
+
+test("first reply to an actual on-screen greeting is not preceded by fictional examples",()=>{
+ const first=primeWithSankoExamples([],"То же, шо и у тебя.",{skipExamples:true});
+ assert.deepEqual(first,[{role:"user",parts:[{text:"То же, шо и у тебя."}]}]);
+ const history=[{role:"user",text:"Узнал?"},{role:"model",text:"Узнал."}];
+ const followup=primeWithSankoExamples(history,"И шо?",{skipExamples:true});
+ assert.deepEqual(followup,[
+  {role:"user",parts:[{text:"Узнал?"}]},
+  {role:"model",parts:[{text:"Узнал."}]},
+  {role:"user",parts:[{text:"И шо?"}]}
+ ]);
+});
