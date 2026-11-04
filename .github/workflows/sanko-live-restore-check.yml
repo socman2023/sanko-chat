@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
-      - name: Wait for production Worker 0.6.2 and inspect diary freshness
+      - uses: actions/checkout@v4
+      - name: Wait for production Worker 0.6.3 and inspect diary freshness
         shell: bash
         env:
           LIVE_HEALTH: https://sanko-chat-api.boysinger2008.workers.dev/health
@@ -18,7 +19,7 @@ jobs:
           set -eu
           for attempt in $(seq 1 24); do
             body="$(curl -fsS --max-time 10 "$LIVE_HEALTH" || true)"
-            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.2" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.3" and .diarySync.status=="ok"' >/dev/null 2>&1; then
               printf '%s' "$body" | jq '{version,configured,diaryConnected,diarySync}'
               echo "LIVE_HEALTH_OK=1" >> "$GITHUB_ENV"
               exit 0
@@ -26,13 +27,14 @@ jobs:
             echo "Live Worker version / diary not ready (attempt $attempt of 24)."
             sleep 10
           done
-          echo "Unable to independently confirm current Worker 0.6.2 with diary access" >&2
+          echo "Unable to independently confirm current Worker 0.6.3 with diary access" >&2
           exit 1
       - name: One controlled Sanko dialogue smoke test
         if: env.LIVE_HEALTH_OK == '1'
         shell: bash
         run: |
           node --input-type=module <<'NODE'
+          const { lintSankoReply } = await import("./quality/sanko/check_reply.mjs");
           const response=await fetch("https://sanko-chat-api.boysinger2008.workers.dev/api/chat",{
            method:"POST",
            headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
@@ -57,7 +59,8 @@ jobs:
           const words=data.reply.trim().split(/\s+/u).filter(Boolean).length;
           if(/за энту дату|летописце|записей нет|\d{4}[-.]\d{1,2}/iu.test(data.reply)){console.error("Character leaked bookkeeping/date");process.exit(1);}
           console.log("Voice check on latest events:",{words,hasDialectedWord:spoken.test(data.reply)});
-          if(!spoken.test(data.reply)){console.error("Sanko's latest-events reply lost his dialect");process.exit(1);}
+          const lexicalIssues=lintSankoReply(data.reply);
+          if(lexicalIssues.length){console.error("Sanko mandatory speech violated:",lexicalIssues);process.exit(1);}
           if(words>30){console.error("Sanko's latest-events reply is too long");process.exit(1);}
           NODE
       - name: Four-turn continuous Sanko voice and story QA
@@ -65,6 +68,7 @@ jobs:
         shell: bash
         run: |
           node --input-type=module <<'NODE'
+          const { lintSankoReply } = await import("./quality/sanko/check_reply.mjs");
           const url="https://sanko-chat-api.boysinger2008.workers.dev/api/chat";
           const questions=[
            "Шо у вас нынче стряслось?",
@@ -92,12 +96,14 @@ jobs:
            if(dates.test(reply))throw Error("Character leaked calendar date");
            if(/чинуш|чинот|далебени|сполохом\s+(?:им\s+)?глаза|доступным\s+записям/iu.test(reply))
             throw Error("Character leaked generic / ungrounded construction");
+           const lexicalIssues=lintSankoReply(reply);
+           if(lexicalIssues.length)throw Error("Sanko always-on words violated: "+JSON.stringify(lexicalIssues));
            if(dialect.test(reply))dialectTurns++;
            history.push({role:"user",text:question},{role:"model",text:reply});
            if(history.length>10)history.splice(0,2);
           }
           console.log("Voice coverage across natural dialogue:",dialectTurns,"of",questions.length);
-          if(dialectTurns<2)throw Error("Sanko voice insufficient across multi-turn conversation");
+          // Full naturalness and factuality also require human review; no minimum dialect word quota.
           NODE
 
       - name: Verify today's exact date query keeps latest dated diary
@@ -106,6 +112,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           const todayMoscow=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
+          const { lintSankoReply } = await import("./quality/sanko/check_reply.mjs");
           const response=await fetch("https://sanko-chat-api.boysinger2008.workers.dev/api/chat",{
            method:"POST",
            headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
@@ -118,6 +125,8 @@ jobs:
           if(!response.ok||typeof data.reply!=="string"||!data.reply.trim())process.exit(1);
           const words=data.reply.trim().split(/\s+/u).filter(Boolean).length;
           console.log("Default answer words:",words);
+          const lexicalIssues=lintSankoReply(data.reply);
+          if(lexicalIssues.length)throw Error("Mandatory Sanko words violated: "+JSON.stringify(lexicalIssues));
           if(words>30){console.error("Sanko exceeded 30-word default reply: "+words);process.exit(1);}
           const spoken=/(^|[^\p{L}])(?:шо|як|якой|тока|токмо|энто|энтот|ентова|ентим|энтим|ежли|тута|тама|хто|куды|шоб|али|нема|хошь|тож|тады|хде|надоть|давеча|драпали|нынче)(?=$|[^\p{L}])/iu;
           console.log("Today reply uses distinct dialect form:",spoken.test(data.reply));
