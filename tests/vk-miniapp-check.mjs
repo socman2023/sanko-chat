@@ -188,3 +188,15 @@ test("standalone desktop continues to restore input focus",async()=>{
  assert.equal(input.focused,true);
  assert.equal(x.chatCalls.length,1);
 });
+
+test("Sanko VK desktop sidebar uses actual treehouse image, preserving readable text",()=>{
+ const photo=readFileSync(new URL("../assets/sanko-oselya-sidebar.webp",import.meta.url));
+ assert.equal(photo.toString("ascii",0,4),"RIFF");
+ assert.equal(photo.toString("ascii",8,12),"WEBP");
+ assert(photo.byteLength>10000 && photo.byteLength<100000,"Keep image real but lightweight");
+ assert(css.includes("background:url('./sanko-oselya-sidebar.webp') center center/cover no-repeat"));
+ assert(!css.includes("background:url('./forest.svg')"),"Old generic forest must not remain active");
+ assert.match(css,/\.side:after\{[^}]*linear-gradient\(180deg,/u);
+ assert(html.includes('class="side"') && html.includes('sanko-portrait.jpg'));
+ assert(css.includes("@media (min-width:800px) and (min-height:560px)"));
+});
