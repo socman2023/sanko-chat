@@ -23,6 +23,10 @@ function createEnv() {
     },
     async all(){
      calls.push({sql:this.sql,values:this.values});
+     if(sql.includes("FROM token_usage u JOIN chat_turns t"))return {results:[
+      {admissionId:"admission-1",attemptedAt:1000,model:"gemini-3.5-flash-lite",result:"provider_quota",totalTokens:null},
+      {admissionId:"admission-1",attemptedAt:1002,model:"gemini-3.6-flash",result:"answered",totalTokens:4525}
+     ]};
      if(sql.includes("token_usage")&&sql.includes("GROUP BY day"))return {results:[]};
      if(sql.includes("token_usage")&&sql.includes("GROUP BY model"))return {results:[{model:"gemini-3.5-flash-lite",calls:2,meteredCalls:1,unknownCalls:1,total:4525,prompt:4500,candidate:22,thoughts:3,cached:200}]};
      if(sql.includes("GROUP BY day"))return {results:[{day:"2026-11-02",n:5,ips:3}]};
@@ -32,7 +36,7 @@ function createEnv() {
       conversationId:CONVERSATION,firstAt:1000,lastAt:1005,turns:2,preview:"Привет"
      }]};
      if(sql.includes("FROM chat_turns WHERE conversation_id"))return {results:[{
-      id:1,askedAt:1000,question:"Привет",reply:"Здрав будь.",model:"gemini-3.5-flash-lite",status:"answered"
+      id:1,admissionId:"admission-1",askedAt:1000,question:"Привет",reply:"Здрав будь.",model:"gemini-3.5-flash-lite",status:"answered"
      }]};
      return {results:[]};
     }
@@ -118,6 +122,13 @@ test("admin conversations list, search and thread detail are authenticated",asyn
  assert.equal(r.status,200);
  const dialog=await r.json();
  assert.equal(dialog.turns[0].reply,"Здрав будь.");
+ assert.equal(dialog.attemptsAvailable,true);
+ assert.deepEqual(dialog.turns[0].attempts.map(a=>[a.model,a.result,a.totalTokens]),[
+  ["gemini-3.5-flash-lite","provider_quota",null],
+  ["gemini-3.6-flash","answered",4525]
+ ]);
+ assert(!JSON.stringify(dialog).includes("admission-1"),"Do not expose admission key to browser");
+ assert(calls.some(c=>c.sql.includes("JOIN chat_turns t ON t.admission_id=u.admission_id")));
  r=await worker.fetch(request("/admin/chats/thread",{method:"POST",token:TOKEN,
   origin:BASE,body:{conversationId:"invalid-uuid"}}),env,wait);
  assert.equal(r.status,400);
