@@ -720,3 +720,80 @@ test("live conversation contract removes invented official and mistaken person e
    "Купчик на нас донес, будто мы его обмануть хотели. Стража явилась, ну мы и дали деру.");
  }finally{globalThis.fetch=original;}
 });
+
+
+async function signedVkLaunch(appId,userId,secret){
+ const q=new URLSearchParams({
+  vk_app_id:String(appId),
+  vk_user_id:String(userId),
+  vk_ts:String(Math.floor(Date.now()/1000)),
+  vk_platform:"mobile_web"
+ });
+ const ordered=[...q.entries()].filter(([k])=>k.startsWith("vk_"))
+  .sort((a,b)=>a[0].localeCompare(b[0],"en"));
+ const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),
+  {name:"HMAC",hash:"SHA-256"},false,["sign"]);
+ const sig=new Uint8Array(await crypto.subtle.sign("HMAC",key,
+  new TextEncoder().encode(new URLSearchParams(ordered).toString())));
+ q.set("sign",Buffer.from(sig).toString("base64url"));
+ return "?"+q.toString();
+}
+
+test("real VK app ID signed launch classifies Sanko's OWN friend",async()=>{
+ const {env}=envStub();
+ env.VK_APP_ID="54875852";
+ env.VK_APP_SECRET="FAKE_SANKO_VK_SECRET";
+ env.VK_OWNER_USER_ID="700010";
+ env.VK_SERVICE_TOKEN="FAKE_VK_SERVICE_TEST_TOKEN";
+ const original=globalThis.fetch;
+ const calls=[];
+ globalThis.fetch=async(url,init)=>{
+  const method=url.split("/").at(-1),params=new URLSearchParams(init.body);
+  calls.push({method,owner:params.get("user_id")});
+  return new Response(JSON.stringify({response:method==="friends.get"
+   ?{count:1,items:[888222]}
+   :method==="users.getFollowers"?{count:0,items:[]}:0}),{status:200});
+ };
+ try{
+  const launch=await signedVkLaunch(54875852,888222,env.VK_APP_SECRET);
+  const request=new Request("https://sanko-chat-api.example/api/session",{
+   method:"POST",
+   headers:{Origin:"https://socman2023.github.io","Content-Type":"application/json"},
+   body:JSON.stringify({vkLaunch:launch,vkFirstName:"Иван",vkFirstNameUserId:888222})
+  });
+  const response=await worker.fetch(request,env,ctx);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.verified,true);
+  assert.equal(data.role,"friend");
+  assert.equal(data.roleChecked,true);
+  assert.equal(data.firstName,"Иван");
+  assert(calls.some(x=>x.method==="friends.get" && x.owner==="700010"));
+  assert(!calls.some(x=>x.owner==="54875852"),"Mini App ID cannot replace VK owner ID");
+ }finally{globalThis.fetch=original;}
+});
+
+test("invalid VK launch never obtains a friend or follower status",async()=>{
+ const {env}=envStub();
+ env.VK_APP_ID="54875852";
+ env.VK_APP_SECRET="FAKE_SANKO_VK_SECRET";
+ env.VK_OWNER_USER_ID="700010";
+ env.VK_SERVICE_TOKEN="FAKE_VK_SERVICE_TEST_TOKEN";
+ const prev=globalThis.fetch;let calls=0;
+ globalThis.fetch=async()=>{calls++;throw Error("VK API must not be called");};
+ try{
+  const launch=await signedVkLaunch(54875852,888222,env.VK_APP_SECRET);
+  const invalid=launch.replace(/sign=[^&]+/u,"sign="+"Z".repeat(43));
+  const response=await worker.fetch(new Request("https://sanko-chat-api.example/api/session",{
+   method:"POST",
+   headers:{Origin:"https://socman2023.github.io","Content-Type":"application/json"},
+   body:JSON.stringify({vkLaunch:invalid,vkFirstName:"Иван",vkFirstNameUserId:888222})
+  }),env,ctx);
+  const data=await response.json();
+  assert.equal(data.verified,false);
+  assert.equal(data.role,"stranger");
+  assert.equal(data.roleChecked,false);
+  assert.equal(data.firstName,"");
+  assert.equal(calls,0);
+ }finally{globalThis.fetch=prev;}
+});
