@@ -31,7 +31,7 @@ export function smoothSankoSpeech(value) {
  // Remove ONLY this confirmed malformed construction. Legitimate "опосля
  // ужина", "мы сами опосля заскочим" and other time uses stay untouched.
  reply=reply.replace(
-  /(?<![\p{L}\p{N}])(плыв(?:ём|ем|у|ут))\s+опосля(?=\s+по\s+реке\b)/giu,
+  /(?<![\p{L}\p{N}])(плыв(?:ём|ем|у|ут))\s+опосля(?=\s+по\s+реке(?![\p{L}\p{N}]))/giu,
   "$1"
  );
 
