@@ -90,6 +90,18 @@ const matchWord=s=>new RegExp("(?<![\\p{L}\\p{N}-])"+s+"(?![\\p{L}\\p{N}-])","gi
 const compiled=MANDATORY_SANKO_FORMS.map(([standard,dialect])=>({
  standard,dialect,re:matchWord(standard)
 })).sort((a,b)=>b.standard.length-a.standard.length); // Multiword phrases before their constituent words.
+// Only Sanko's OWN vocabulary is subject to mandatory dialect forms.
+// Literal quotations and quoted dictionary meanings are not his own words.
+// Splitting on complete quote pairs also preserves indices for diagnostics.
+const quotes=/(«[^»]*»|“[^”]*”|"[^"]*"|'[^']*')/gu;
+const quoted=/^(?:«[^»]*»|“[^”]*”|"[^"]*"|'[^']*')$/u;
+export function mapUnquotedSankoText(value,transform) {
+ return String(value||"").split(quotes).map(part=>quoted.test(part)?part:transform(part)).join("");
+}
+export function maskQuotedSankoText(value) {
+ return String(value||"").replace(quotes,m=>" ".repeat(m.length));
+}
+
 function preserveCase(original,replacement) {
  if(original===original.toUpperCase())return replacement.toUpperCase();
  if(original[0]===original[0].toUpperCase())
@@ -97,7 +109,7 @@ function preserveCase(original,replacement) {
  return replacement;
 }
 export function literaryEquivalentsInSankoSpeech(text) {
- const value=String(text||""),violations=[];
+ const value=maskQuotedSankoText(text),violations=[];
  for(const x of compiled) {
   for(const match of value.matchAll(x.re))
    violations.push({word:match[0],required:x.dialect,index:match.index});
@@ -105,8 +117,10 @@ export function literaryEquivalentsInSankoSpeech(text) {
  return violations;
 }
 export function enforceMandatorySankoForms(value) {
- let text=String(value||"");
- for(const x of compiled)
-  text=text.replace(x.re,word=>preserveCase(word,x.dialect));
- return text;
+ return mapUnquotedSankoText(value,part=>{
+  let text=part;
+  for(const x of compiled)
+   text=text.replace(x.re,word=>preserveCase(word,x.dialect));
+  return text;
+ });
 }

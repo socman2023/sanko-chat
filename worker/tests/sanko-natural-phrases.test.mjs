@@ -46,3 +46,25 @@ test("do not invent a чинуша or misuse second-person хошь for мы",()
  assert.equal(smoothSankoSpeech("Ты шо хошь?"),"Ты шо хошь?");
  assert.equal(smoothSankoSpeech(expected),expected);
 });
+
+test("current river journey must not contain orphan 'опосля' filler",()=>{
+ for(const raw of [
+  "Плывем опосля по реке на джонке.",
+  "Плывём опосля по реке на джонке.",
+  "Плыву опосля по реке."
+ ]){
+  const out=smoothSankoSpeech(raw);
+  assert(!/(?:плывём|плывем|плыву)\s+опосля/iu.test(out),out);
+  assert(out.includes("по реке"),out);
+  assert.equal(smoothSankoSpeech(out),out);
+ }
+ for(const natural of [
+  "Опосля уроков испытаем.",
+  "Мы сами опосля заскочим.",
+  "Опосля ужина отправимся туды.",
+  "Опосля того, як поговорили, сели на лодку.",
+  "Плывём по реке опосля ужина."
+ ]){
+  assert.equal(smoothSankoSpeech(natural),natural,"Canonical use must stay intact: "+natural);
+ }
+});

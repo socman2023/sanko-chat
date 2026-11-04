@@ -69,3 +69,14 @@ test("new directional and temporal forms are mandatory, with multiword priority"
  assert.equal(enforceMandatorySankoForms("После ужина отправимся туды."),
   "Опосля ужина отправимся туды.");
 });
+
+test("literal quotations and dictionary meanings must not be converted into nonsense",()=>{
+ const phrase='«После» значит «после». После дождя снова плывём.';
+ assert.equal(enforceMandatorySankoForms(phrase),
+  '«После» значит «после». Опосля дождя снова плывём.');
+ assert.deepEqual(literaryEquivalentsInSankoSpeech('Опосля — значит «после». Приехали опосля.'),[]);
+ assert.equal(enforceMandatorySankoForms('Купец спросил: «Что это?» Я ему сказал, что не знаю.'),
+  'Купец спросил: «Что это?» Я ему сказал, шо не знаю.');
+ assert.equal(enforceMandatorySankoForms('Я после ужина приду.'),
+  'Я опосля ужина приду.');
+});

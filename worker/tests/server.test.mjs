@@ -1053,3 +1053,40 @@ test("Sanko's live API corrects Christian praise to canonical 'Слава Вар
    "Saved reply must not preserve the wrong exclamation");
  }finally{globalThis.fetch=original;}
 });
+
+
+test("screenshot regression: first turn loses meaningless опосля; follow-up cannot define it in a circle",async()=>{
+ const {env,observed}=envStub(),old=globalThis.fetch;
+ const responses=[
+  "Плывем опосля по реке на джонке. Ищем баржу, куды Элинку с Руманом увезли.",
+  "Опосля — энто значит опосля. Опосля того, як с человеком поговорили.",
+  "Опосля — энто значит после."
+ ];
+ let calls=0;
+ globalThis.fetch=async()=>{
+  const answer=responses[calls++];
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:answer}]}}]}),{status:200});
+ };
+ try{
+  const first=await worker.fetch(dialogueRequest("Сам говори, что было?"),env,ctx);
+  assert.equal(first.status,200);
+  const one=(await first.json()).reply;
+  assert.equal(one,"Плывем по реке на джонке. Ищем баржу, куды Элинку с Руманом увезли.");
+  const oldConversation=[
+   {role:"user",text:"Сам говори, что было?"},
+   {role:"model",text:responses[0]}
+  ];
+  const second=await worker.fetch(dialogueRequest('Чего "опосля"?',"",oldConversation),env,ctx);
+  assert.equal(second.status,200);
+  assert.equal((await second.json()).reply,"Лишнее слово вставил. Плывем по реке на джонке.");
+  const realGlossHistory=[
+   {role:"user",text:"Что нового?"},
+   {role:"model",text:"Опосля ужина отправимся."}
+  ];
+  const third=await worker.fetch(dialogueRequest('Что значит «опосля»?',"",realGlossHistory),env,ctx);
+  assert.equal(third.status,200);
+  assert.equal((await third.json()).reply,"Опосля — энто значит «после».");
+  assert.equal(calls,3,"No extra Gemini calls");
+  assert.equal(observed.insertions.length,3,"Three turns persisted");
+ }finally{globalThis.fetch=old;}
+});

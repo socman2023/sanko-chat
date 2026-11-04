@@ -12,7 +12,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,13 +24,13 @@ jobs:
           set -eu
           for i in $(seq 1 18); do
             body="$(curl -fsS --max-time 9 https://sanko-chat-api.boysinger2008.workers.dev/health || true)"
-            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.12" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.13" and .diarySync.status=="ok"' >/dev/null 2>&1; then
               printf '%s' "$body" | jq '{version,diarySync}'
               exit 0
             fi
             sleep 8
           done
-          echo "New Worker v0.6.12 / diary not verified" >&2
+          echo "New Worker v0.6.13 / diary not verified" >&2
           exit 1
       - name: Test first reply referencing the actual VK greeting
         shell: bash
@@ -52,7 +52,7 @@ jobs:
           const data=await response.json();
           const reply=data.reply||"";
           console.log(JSON.stringify({http:response.status,
-            worker:"sanko-worker-0.6.12",
+            worker:"sanko-worker-0.6.13",
             model:data.model,reply,diaryPosts:data.knowledge?.diaryPosts},null,2));
           if(!response.ok||!reply.trim())throw Error("First reply unavailable");
           const words=reply.trim().split(/\s+/u).length;
@@ -85,4 +85,23 @@ jobs:
             throw Error("Mandatory dialect or calendar violated in clarification");
           if(/(?:^|[^\p{L}])(?:покудь|досильно|уречно)(?=$|[^\p{L}])/iu.test(explanation))
             throw Error("Invented Sanko word in clarification");
+          // Screenshot regression: a previously saved malformed reply must
+          // not provoke a circular "опосля значит опосля" explanation.
+          const oldAnswer="Плывем опосля по реке на джонке. Ищем баржу.";
+          const faulty=await fetch(url,{
+            method:"POST",
+            headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
+            body:JSON.stringify({
+              message:"Чего «опосля»?",
+              history:[{role:"user",text:"Сам говори, что было?"},
+                {role:"model",text:oldAnswer}],
+              conversationId:crypto.randomUUID()
+            })
+          });
+          const fixed=await faulty.json();
+          console.log(JSON.stringify({screenshotRegression:true,http:faulty.status,
+            model:fixed.model,reply:fixed.reply},null,2));
+          if(!faulty.ok||
+              fixed.reply!=="Лишнее слово вставил. Плывем по реке на джонке.")
+            throw Error("Old broken Sanko 'опосля' dialogue was not repaired");
           NODE
