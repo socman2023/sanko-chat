@@ -3,16 +3,16 @@ import assert from "node:assert/strict";
 import { normalizeSankoFaith } from "../src/sanko-faith.js";
 import { SANKO_VOICE_RULES } from "../src/sanko-voice.js";
 
-test("the exact user-reported Christian idiom becomes canonical plural",()=>{
- assert.equal(normalizeSankoFaith("Живы, слава Богу!"),"Живы, слава богам!");
- assert.equal(normalizeSankoFaith("Слава Богу, добрались."),"Слава богам, добрались.");
+test("a Christian idiom becomes book-attested Sanko praise of Varok",()=>{
+ assert.equal(normalizeSankoFaith("Живы, слава Богу!"),"Живы, слава Вароку!");
+ assert.equal(normalizeSankoFaith("Слава Богу, добрались."),"Слава Вароку, добрались.");
  assert.equal(normalizeSankoFaith("О, боги!"),"О, боги!");
  assert.equal(normalizeSankoFaith("Живы, и ладно."),"Живы, и ладно.");
 });
 test("do not rewrite outsiders' direct faith quotations or names",()=>{
  const raw='Купец сказал: «Слава Богу!». А мы, слава Богу, выжили.';
  assert.equal(normalizeSankoFaith(raw),
-  'Купец сказал: «Слава Богу!». А мы, слава богам, выжили.');
+  'Купец сказал: «Слава Богу!». А мы, слава Вароку, выжили.');
  assert.equal(normalizeSankoFaith('“Боже мой” — сказала чужестранка.'),
   '“Боже мой” — сказала чужестранка.');
  assert.equal(normalizeSankoFaith('Господин Арборис говорит о Роде-Батюшке.'),
@@ -31,4 +31,5 @@ test("belief contract follows named canonical Slavic pantheon without mandatory 
   assert(SANKO_VOICE_RULES.includes(name),name);
  assert.match(SANKO_VOICE_RULES,/Ты НЕ православный и не христианин/u);
  assert.match(SANKO_VOICE_RULES,/не вставляй без причины/u);
+ assert.match(SANKO_VOICE_RULES,/«Слава Вароку!»/u);
 });
