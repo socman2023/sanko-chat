@@ -251,7 +251,7 @@ test("Entire published posts reach Gemini: 6k, 15k, >16k and >62k total",async()
 
 test("model fallback after 429: primary overloaded, first reserve succeeds",async()=>{
  const {env,observed}=envStub();
- env.GEMINI_MODEL_ORDER="gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash";
+ env.GEMINI_MODEL_ORDER="gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash";
  const calls=[];
  const original=globalThis.fetch;
  globalThis.fetch=async(url,init)=>{
@@ -267,10 +267,10 @@ test("model fallback after 429: primary overloaded, first reserve succeeds",asyn
   const response=await worker.fetch(req("Здрав будь, Санко."),env,ctx);
   assert.equal(response.status,200);
   const data=await response.json();
-  assert.equal(data.model,"gemini-3.5-flash-lite");
+  assert.equal(data.model,"gemini-3.1-flash-lite");
   assert.equal(data.fallbackUsed,true);
   assert.equal(data.reply,"Я тут. Скажи, чего хотел?");
-  assert.deepEqual(calls.map(x=>x.model),["gemini-3.6-flash","gemini-3.5-flash-lite"]);
+  assert.deepEqual(calls.map(x=>x.model),["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
   assert.deepEqual(calls[0].body.systemInstruction,calls[1].body.systemInstruction);
   assert.deepEqual(calls[0].body.contents,calls[1].body.contents);
   assert.equal(observed.insertions.length,1,"Fallback must consume one Sanko admission");
@@ -279,7 +279,7 @@ test("model fallback after 429: primary overloaded, first reserve succeeds",asyn
 
 test("fallback steps through transient error, empty and truncated replies to fourth model",async()=>{
  const {env,observed}=envStub();
- env.GEMINI_MODEL_ORDER="gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash";
+ env.GEMINI_MODEL_ORDER="gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash";
  const calls=[];
  const original=globalThis.fetch;
  globalThis.fetch=async(url)=>{
@@ -296,15 +296,15 @@ test("fallback steps through transient error, empty and truncated replies to fou
   const data=await response.json();
   assert.equal(data.model,"gemini-3.8-flash");
   assert.equal(data.fallbackUsed,true);
-  assert.deepEqual(calls,["gemini-3.6-flash","gemini-3.5-flash-lite",
-   "gemini-3.1-flash-lite","gemini-3.8-flash"]);
+  assert.deepEqual(calls,["gemini-3.5-flash-lite","gemini-3.1-flash-lite",
+   "gemini-3.6-flash","gemini-3.8-flash"]);
   assert.equal(observed.insertions.length,1);
  }finally{globalThis.fetch=original;}
 });
 
 test("safety-blocked reply is not bypassed via fallback",async()=>{
  const {env}=envStub();
- env.GEMINI_MODEL_ORDER="gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash";
+ env.GEMINI_MODEL_ORDER="gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash";
  const calls=[];
  const original=globalThis.fetch;
  globalThis.fetch=async(url)=>{
@@ -438,12 +438,12 @@ test("Gemini usageMetadata is recorded for each actual attempt including fallbac
   const r=await worker.fetch(req("Расскажи о себе"),env,ctx);
   assert.equal(r.status,200);
   assert.equal(observed.usageInserts.length,2);
-  assert.deepEqual(models,["gemini-3.6-flash","gemini-3.5-flash-lite"]);
+  assert.deepEqual(models,["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
   const a=observed.usageInserts[0].values,b=observed.usageInserts[1].values;
-  assert.equal(a[3],"gemini-3.6-flash");
+  assert.equal(a[3],"gemini-3.5-flash-lite");
   assert.equal(a[4],"provider_quota");
   assert.equal(a[9],null,"Missing metadata must not be counted as zero");
-  assert.equal(b[3],"gemini-3.5-flash-lite");
+  assert.equal(b[3],"gemini-3.1-flash-lite");
   assert.equal(b[4],"answered");
   assert.deepEqual(b.slice(5),[4500,22,3,200,4525]);
   assert(!JSON.stringify(observed.usageInserts).includes("Расскажи о себе"),
