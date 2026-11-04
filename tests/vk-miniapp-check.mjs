@@ -127,14 +127,24 @@ test("unsuitable VK insets never become unsafe dimensions",async()=>{
  assert.equal(x.styles.get("--vk-inset-right"),"12px");
  await new Promise(r=>setTimeout(r,25));
 });
-test("VK-only CSS does not override the standalone layout",()=>{
+test("VK desktop shows Sanko's panel, while mobile and short VK frames remain chat-first",()=>{
  for(const token of [
   "html.vk-embedded","--vk-visible-height","--vk-inset-bottom",
   ".vk-embedded .side{display:none}",".vk-embedded .composer-wrap",
   ".vk-embedded .messages",".vk-embedded .topbar"
  ])assert(css.includes(token),token);
- assert(css.includes("safe-area-inset-bottom"),"VK must leave space for safe areas");
+ // The initial VK-only selector intentionally stays one-column; a narrower
+ // responsive rule restores the actual existing sidebar on desktop.
+ const desktop=css.match(/@media \(min-width:800px\) and \(min-height:560px\) \{([\s\S]*?)\n\}/u);
+ assert(desktop,"VK desktop breakpoint must be scoped by iframe width and height");
+ assert.match(desktop[1],/\.vk-embedded \.shell\s*\{\s*display:grid/u);
+ assert.match(desktop[1],/grid-template-columns:clamp\(270px,35%,345px\) minmax\(0,1fr\)/u);
+ assert.match(desktop[1],/\.vk-embedded \.side\s*\{\s*display:flex/u);
+ assert.match(desktop[1],/\.vk-embedded \.chat\s*\{height:100%;min-width:0;min-height:0\}/u);
  assert(css.includes("@media(max-width:700px)"),"Regular mobile layout preserved");
+ assert(css.includes("safe-area-inset-bottom"),"VK must leave space for safe areas");
+ assert(html.includes('class="side"') && html.includes('sanko-portrait.jpg'),
+  "VK desktop must use the canon portrait and existing side panel");
 });
 
 

@@ -41,10 +41,9 @@ button:disabled,textarea:disabled{opacity:.56;cursor:not-allowed}.composer-note{
 @media(prefers-reduced-motion:no-preference){.bubble{animation:appear .17s ease-out}@keyframes appear{from{opacity:.55;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}}
 
 
-/* VK Mini App: VK desktop iframe and mobile WebView use a full-height,
-   chat-first layout. The ordinary standalone website is unchanged.
-   Bridge insets account for client panels; visualViewport accounts for the
-   virtual keyboard without locking the composer underneath it. */
+/* VK Mini App: desktop iframe gets the same two-column layout as the
+   standalone chat; narrow or short VK windows keep the chat-only layout.
+   Bridge insets and visualViewport still protect the virtual keyboard. */
 html.vk-embedded,html.vk-embedded body{height:100%;overflow:hidden}
 .vk-embedded body{background:var(--cream)}
 .vk-embedded .shell{display:block;width:100%;height:var(--vk-visible-height,100dvh);min-height:0;margin:0;border:0;box-shadow:none}
@@ -69,4 +68,38 @@ html.vk-embedded,html.vk-embedded body{height:100%;overflow:hidden}
  .vk-embedded .kicker,.vk-embedded .top-sub,.vk-embedded .composer-note{display:none}
  .vk-embedded .messages{padding-top:8px;padding-bottom:8px;gap:8px}
  .vk-embedded .composer-wrap{padding-top:7px}
+}
+
+/* VK desktop: restore Sanko's existing forest/portrait panel. The breakpoint
+   checks the actual iframe viewport, not the full browser window. Narrow and
+   short WebViews remain one-column so the composer never loses usable room. */
+@media (min-width:800px) and (min-height:560px) {
+  .vk-embedded .shell {
+    display:grid;
+    grid-template-columns:clamp(270px,35%,345px) minmax(0,1fr);
+  }
+  .vk-embedded .side {
+    display:flex;
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    padding:clamp(17px,2.6vh,27px) clamp(17px,2.1vw,26px) 17px;
+  }
+  .vk-embedded .portrait {width:190px;height:213px;margin-bottom:13px}
+  .vk-embedded .side h1 {font-size:clamp(43px,4vw,55px)}
+  .vk-embedded .ornament {margin:8px 0 13px}
+  .vk-embedded .side-quote {margin:12px 0 16px}
+  .vk-embedded .chat {height:100%;min-width:0;min-height:0}
+  .vk-embedded .topbar {padding-right:20px;padding-left:20px}
+  .vk-embedded .messages {padding-right:23px;padding-left:23px}
+  .vk-embedded .composer-wrap {padding-right:20px;padding-left:20px}
+}
+/* Extra height sensitivity: keep a full portrait without pushing the
+   bottom of the sidebar out of view in compact desktop VK windows. */
+@media (min-width:800px) and (min-height:560px) and (max-height:700px) {
+  .vk-embedded .portrait {width:155px;height:174px;margin-bottom:9px}
+  .vk-embedded .side h1 {font-size:45px}
+  .vk-embedded .side-sub {font-size:18px}
+  .vk-embedded .side-quote {font-size:18px;margin:10px 0}
+  .vk-embedded .aside-foot {font-size:14px;padding-top:9px}
 }
