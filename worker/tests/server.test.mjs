@@ -597,39 +597,6 @@ test("dates or admin phrases returned by Gemini never reach Sanko visitor",async
 });
 
 
-test("plain generic Sanko answer gets ONE fact-constrained voice rewrite with both usages tracked",async()=>{
- const {env,observed}=envStub({diary:true,diaryPosts:[{
-  post_id:14566,owner_id:850667816,published_day_msk:dayInMoscow(),published_at:Date.now()/1000,
-  source_url:"https://vk.ru/wall850667816_14566",
-  source_text:"Купец навел городскую стражу на ребят. Укрылись на складе у реки."
- }]});
- const prev=globalThis.fetch;
- const requests=[];
- globalThis.fetch=async(_url,init)=>{
-  const body=JSON.parse(init.body);
-  requests.push(body);
-  const answer=requests.length===1
-   ?"Эх, денек выдался! От стражи городского чинуши еле удрали, а ночлег теперь у местных воров на складе у реки."
-   :"Тот купчик стражу на нас навёл. Еле ноги унесли, а нынче тута на складе сидим.";
-  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:answer}]}}],
-   usageMetadata:{promptTokenCount:320,candidatesTokenCount:25,totalTokenCount:345}}),{status:200});
- };
- try {
-  const r=await worker.fetch(req("А чего вы бежали?"),env,ctx);
-  const data=await r.json();
-  assert.equal(r.status,200);
-  assert.equal(requests.length,2);
-  assert.match(data.reply,/нынче тута/);
-  assert(!data.reply.includes("чинуши"));
-  assert.equal(observed.usageInserts.length,2,"Count both original and editorial Gemini requests");
-  assert.equal(observed.usageInserts[1].values[4],"voice_rewrite_answered");
-  assert.equal(observed.usageInserts[1].values[3],"gemini-3.6-flash");
-  assert.equal(requests[1].generationConfig.maxOutputTokens,1536);
-  assert.equal(requests[1].generationConfig.temperature,0.15);
-  assert.match(requests[1].contents[0].parts[0].text,/Купец навел городскую стражу/);
- }finally{globalThis.fetch=prev;}
-});
-
 test("a naturally short Sanko reply causes no extra token-consuming rewrite",async()=>{
  const {env,observed}=envStub();
  const prev=globalThis.fetch;let calls=0;
@@ -647,4 +614,29 @@ test("a naturally short Sanko reply causes no extra token-consuming rewrite",asy
   assert.equal(calls,1);
   assert.equal(observed.usageInserts.length,1);
  }finally{globalThis.fetch=prev;}
+});
+
+
+test("Sanko sends authentic speech examples BEFORE real history without a second model request",async()=>{
+ const {env,observed}=envStub();
+ const old=globalThis.fetch,requests=[];
+ globalThis.fetch=async(_,init)=>{
+  requests.push(JSON.parse(init.body));
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{
+   parts:[{text:"Здрав будь, брат."}]
+  }}],usageMetadata:{promptTokenCount:250,candidatesTokenCount:5,totalTokenCount:255}}),{status:200});
+ };
+ try{
+  const r=await worker.fetch(req("Ну расскажи шо-нибудь."),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal(requests.length,1,"No extra editorial Gemini calls");
+  const contents=requests[0].contents;
+  assert.equal(contents[0].role,"user");
+  assert.match(contents[0].parts[0].text,/Только образец манеры речи/);
+  assert.equal(contents[1].role,"model");
+  assert.equal(contents[1].parts[0].text,"Ты шо, дырку протереть хошь?");
+  assert.equal(contents.at(-1).parts[0].text,"Ну расскажи шо-нибудь.");
+  assert.equal(requests[0].generationConfig.temperature,0.4);
+  assert.equal(observed.usageInserts.length,1);
+ }finally{globalThis.fetch=old;}
 });
