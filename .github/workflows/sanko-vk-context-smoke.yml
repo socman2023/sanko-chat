@@ -12,7 +12,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -85,4 +85,23 @@ jobs:
             throw Error("Mandatory dialect or calendar violated in clarification");
           if(/(?:^|[^\p{L}])(?:покудь|досильно|уречно)(?=$|[^\p{L}])/iu.test(explanation))
             throw Error("Invented Sanko word in clarification");
+          // Screenshot regression: a previously saved malformed reply must
+          // not provoke a circular "опосля значит опосля" explanation.
+          const oldAnswer="Плывем опосля по реке на джонке. Ищем баржу.";
+          const faulty=await fetch(url,{
+            method:"POST",
+            headers:{"Origin":"https://socman2023.github.io","Content-Type":"application/json"},
+            body:JSON.stringify({
+              message:"Чего «опосля»?",
+              history:[{role:"user",text:"Сам говори, что было?"},
+                {role:"model",text:oldAnswer}],
+              conversationId:crypto.randomUUID()
+            })
+          });
+          const fixed=await faulty.json();
+          console.log(JSON.stringify({screenshotRegression:true,http:faulty.status,
+            model:fixed.model,reply:fixed.reply},null,2));
+          if(!faulty.ok||
+              fixed.reply!=="Лишнее слово вставил. Плывем по реке на джонке.")
+            throw Error("Old broken Sanko 'опосля' dialogue was not repaired");
           NODE
