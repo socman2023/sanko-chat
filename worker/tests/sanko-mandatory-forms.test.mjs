@@ -8,8 +8,8 @@ import { MANDATORY_SANKO_FORMS,enforceMandatorySankoForms,
 const dir=dirname(fileURLToPath(import.meta.url));
 const authority=JSON.parse(readFileSync(join(dir,"../../quality/sanko/voice_contract.json"),"utf8"));
 
-test("production mapping exactly follows latest author-approved 18 forms",()=>{
- assert.equal(MANDATORY_SANKO_FORMS.length,18);
+test("production mapping exactly follows latest author-approved 25 forms",()=>{
+ assert.equal(MANDATORY_SANKO_FORMS.length,25);
  assert.deepEqual(MANDATORY_SANKO_FORMS,
   authority.mandatoryLexemes.map(x=>[x.standard,x.required[0]]));
 });
@@ -53,4 +53,19 @@ test("fixed-form guard never invents content or extra API calls",()=>{
  assert.equal(out,"Он сказал, шо ушёл. Потом мы пошли домой.");
  assert.equal(out.split(/[.!?]/u).length,raw.split(/[.!?]/u).length);
  assert.equal(out.includes("сполох"),false);
+});
+
+test("new directional and temporal forms are mandatory, with multiword priority",()=>{
+ const input="До сих пор после дождя сюда шли, потом туда, а пока до туда не добрались.";
+ const expected="Досель опосля дождя сюды шли, потом туды, а покуда дотуль не добрались.";
+ assert.equal(enforceMandatorySankoForms(input),expected);
+ for(const sentence of [
+  "Мы после вернёмся.","До сих пор сидим.","Сюда иди.","Туда надо.",
+  "Пока не стемнело, пойдём.","Пойдём дотуда.","Дойдём до туда."
+ ]){
+  const out=enforceMandatorySankoForms(sentence);
+  assert.deepEqual(literaryEquivalentsInSankoSpeech(out),[],out);
+ }
+ assert.equal(enforceMandatorySankoForms("После ужина отправимся туды."),
+  "Опосля ужина отправимся туды.");
 });

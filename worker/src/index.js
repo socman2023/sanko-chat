@@ -12,9 +12,10 @@ import { SANKO_VOICE_RULES,SANKO_VOICE_REMINDER } from "./sanko-voice.js";
 import { primeWithSankoExamples } from "./sanko-dialogue-examples.js";
 import { guardSankoReply } from "./reply-guard.js";
 import { enforceMandatorySankoForms,literaryEquivalentsInSankoSpeech } from "./sanko-mandatory-forms.js";
+import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.6.3";
+const VERSION="sanko-worker-0.6.4";
 const MODEL_ORDER=[
  ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
@@ -452,7 +453,7 @@ async function chat(req,env,origin,ctx) {
  if(guarded.blocked)console.warn("Sanko reply guard: calendar date or bookkeeping removed");
  // The author's ALWAYS rule is stronger than model prompting:
  // keep exactly the 18 approved forms, and never invent new grammar.
- const spoken=enforceMandatorySankoForms(guarded.reply);
+ const spoken=enforceMandatorySankoForms(smoothSankoSpeech(guarded.reply));
  if(literaryEquivalentsInSankoSpeech(spoken).length)
   console.error("Sanko mandatory forms invariant failed");
  await storeTurn(env,id,admission.id,question,spoken,generated.model,"answered");

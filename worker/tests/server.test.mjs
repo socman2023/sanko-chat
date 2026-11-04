@@ -674,3 +674,33 @@ test("a single next-turn reply must not regress to literary pronouns",async()=>{
   assert.equal((await r.json()).reply,"Ну, здрав будь. Як у тебя дела? Энто я тока спросить хотел.");
  }finally{globalThis.fetch=original;}
 });
+
+test("real Sanko chat corrects screenshot redundancy and new mandatory time forms",async()=>{
+ const {env,observed}=envStub(),original=globalThis.fetch;
+ let requests=0;
+ globalThis.fetch=async()=>{
+  requests++;
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{
+   text:"Энто воры туташние нас ночлегом приютили. Сидим в складе у реки, ноги до сих пор дрожат после погони."
+  }]}}],usageMetadata:{promptTokenCount:170,candidatesTokenCount:29,totalTokenCount:199}}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(req("А шо у вас было?"),env,ctx);
+  assert.equal(response.status,200);
+  const answer=(await response.json()).reply;
+  assert.equal(answer,"Воры туташние нас приютили. Сидим в складе у реки, ноги досель дрожат опосля погони.");
+  assert.equal(requests,1,"No extra Free Tier API call");
+  assert.equal(observed.usageInserts.length,1,"Token usage still recorded once");
+ }finally{globalThis.fetch=original;}
+});
+test("real Sanko chat does not append decorative тута after a flight",async()=>{
+ const {env}=envStub(),original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({
+  candidates:[{finishReason:"STOP",content:{parts:[{text:"Еле удрали тута!"}]}}]
+ }),{status:200});
+ try{
+  const r=await worker.fetch(req("Как вы убежали?"),env,ctx);
+  assert.equal(r.status,200);
+  assert.equal((await r.json()).reply,"Еле удрали!");
+ }finally{globalThis.fetch=original;}
+});
