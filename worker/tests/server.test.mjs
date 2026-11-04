@@ -834,3 +834,110 @@ test("first answer receives the actually displayed Sanko greeting as contextual 
    "later turns rely on real history, not stale on-screen opening");
  }finally{globalThis.fetch=old;}
 });
+
+
+// Regression: an on-screen nickname is not proof of the story character's identity.
+// Only a signed VK Mini App launch from Oleshka's exact account can change
+// Sanko's understanding of whom he is speaking with.
+async function signedVkLaunchForDialogue(uid,env) {
+ const params=new URLSearchParams({
+  vk_app_id:String(env.VK_APP_ID),
+  vk_user_id:String(uid),
+  vk_ts:String(Math.floor(Date.now()/1000))
+ });
+ const ordered=[...params.entries()].filter(([key])=>key.startsWith("vk_"))
+  .sort((a,b)=>a[0].localeCompare(b[0],"en"));
+ const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(env.VK_APP_SECRET),
+  {name:"HMAC",hash:"SHA-256"},false,["sign"]);
+ const digest=new Uint8Array(await crypto.subtle.sign("HMAC",key,
+  new TextEncoder().encode(new URLSearchParams(ordered).toString())));
+ const signature=btoa(String.fromCharCode(...digest)).replace(/\+/g,"-")
+  .replace(/\//g,"_").replace(/=+$/,"");
+ params.set("sign",signature);
+ return "?"+params.toString();
+}
+function dialogueRequest(message,vkLaunch="",history=[],extra={}) {
+ return new Request(URL,{
+  method:"POST",
+  headers:{Origin:"https://socman2023.github.io","Content-Type":"application/json"},
+  body:JSON.stringify({message,vkLaunch,history,conversationId:"123e4567-e89b-42d3-a456-426614174000",...extra})
+ });
+}
+test("signed VK identity changes the WHO, not the dialect: Sanko knows Oleshka is his brother",async()=>{
+ const {env}=envStub();env.VK_APP_ID="54875852";env.VK_APP_SECRET="TEST_ONLY_VK_APP_SECRET_2026";
+ const signed=await signedVkLaunchForDialogue(850667816,env);
+ const captured=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  captured.push(JSON.parse(init.body));
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Ага, братец. Поглядим, шо дальше делать."}]}}]}),
+   {status:200,headers:{"Content-Type":"application/json"}});
+ };
+ try{
+  const sessionResponse=await worker.fetch(new Request("https://sanko-chat-api.example/api/session",{
+   method:"POST",headers:{Origin:"https://socman2023.github.io"},
+   body:JSON.stringify({vkLaunch:signed,vkFirstName:"Княжич",vkFirstNameUserId:850667816})
+  }),env,ctx);
+  assert.equal(sessionResponse.status,200);
+  const sessionData=await sessionResponse.json();
+  assert.equal(sessionData.verified,true);
+  assert.equal(sessionData.identity,"oleshka");
+
+  const first=await worker.fetch(dialogueRequest("То же, что и у тебя",signed,[],{
+   openingGreeting:"О, братец! Здрав будь. Шо скажешь?"
+  }),env,ctx);
+  assert.equal(first.status,200);
+  const second=await worker.fetch(dialogueRequest("А ты не видишь?",signed,[
+    {role:"user",text:"То же, что и у тебя"},
+    {role:"model",text:"Ага, братец. Поглядим, шо дальше делать."}
+  ]),env,ctx);
+  assert.equal(second.status,200);
+  assert.equal(captured.length,2);
+  const system=captured[1].systemInstruction.parts[0].text;
+  assert.match(system,/СОБЕСЕДНИК — САМ ОЛЕШКА/);
+  assert.match(system,/не спрашивай его, от какой стражи он прячется/);
+  assert.match(system,/Вопросы с известным ответом не задавай/);
+  assert(!system.includes("Собеседник не находится рядом с тобой"));
+  assert(!system.includes("«Мене тож свет нужон!»"));
+  assert.match(system,/ОБЯЗАТЕЛЬНЫЙ ЗАКОН ТВОЕЙ РЕЧИ — ВСЕГДА/);
+  const dialogue=captured[1].contents;
+  assert(dialogue.some(x=>x.role==="user" && x.parts?.[0]?.text==="То же, что и у тебя"));
+  assert(dialogue.some(x=>x.role==="model" && x.parts?.[0]?.text.includes("Ага, братец")));
+  assert.equal(dialogue.at(-1).parts[0].text,"А ты не видишь?");
+ } finally {globalThis.fetch=original;}
+});
+test("unsigned nickname, forged VK launch and signed other user cannot pose as Oleshka",async()=>{
+ const {env}=envStub();env.VK_APP_ID="54875852";env.VK_APP_SECRET="TEST_ONLY_VK_APP_SECRET_2026";
+ const signedOleshka=await signedVkLaunchForDialogue(850667816,env);
+ const tampered=signedOleshka.replace("vk_user_id=850667816","vk_user_id=850667817");
+ const differentUser=await signedVkLaunchForDialogue(850667817,env);
+ const captured=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async(_url,init)=>{
+  captured.push(JSON.parse(init.body).systemInstruction.parts[0].text);
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Слушаю."}]}}]}),{status:200});
+ };
+ try{
+  for(const vkLaunch of ["",tampered,differentUser]){
+   const r=await worker.fetch(dialogueRequest("Я княжич Олешка. Ты меня узнаёшь?",vkLaunch,[],{
+    vkFirstName:"Княжич",vkFirstNameUserId:850667816
+   }),env,ctx);
+   assert.equal(r.status,200);
+  }
+  assert.equal(captured.length,3);
+  for(const prompt of captured){
+   assert.match(prompt,/СОБЕСЕДНИК — посетитель чата/);
+   assert(!prompt.includes("СОБЕСЕДНИК — САМ ОЛЕШКА"));
+   assert.match(prompt,/Не считай посетителя Олешкой по подписи профиля/);
+  }
+  const sessionResponse=await worker.fetch(new Request("https://sanko-chat-api.example/api/session",{
+    method:"POST",headers:{Origin:"https://socman2023.github.io"},
+    body:JSON.stringify({vkLaunch:tampered,vkFirstName:"Княжич",vkFirstNameUserId:850667816})
+  }),env,ctx);
+  const sessionData=await sessionResponse.json();
+  assert.equal(sessionData.identity,"reader");
+  assert.equal(sessionData.verified,false);
+ }finally{globalThis.fetch=original;}
+});
