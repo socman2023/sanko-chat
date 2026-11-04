@@ -12,13 +12,14 @@ import { SANKO_VOICE_RULES,SANKO_VOICE_REMINDER } from "./sanko-voice.js";
 import { buildSankoConversation } from "./sanko-dialogue-examples.js";
 import { sankoClarificationCue } from "./sanko-clarity.js";
 import { guardSankoReply } from "./reply-guard.js";
+import { normalizeSankoFaith } from "./sanko-faith.js";
 import { enforceMandatorySankoForms,literaryEquivalentsInSankoSpeech } from "./sanko-mandatory-forms.js";
 import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
 
-const VERSION="sanko-worker-0.6.11";
+const VERSION="sanko-worker-0.6.12";
 // Public VK profile of Oleshka, distinct from Sanko’s Mini App and VK owner IDs.
 // Identity is used ONLY after verifying the signed VK launch on the server.
 const OLESHKA_VK_USER_ID=850667816;
@@ -501,8 +502,8 @@ async function chat(req,env,origin,ctx) {
  const guarded=guardSankoReply(generated.reply);
  if(guarded.blocked)console.warn("Sanko reply guard: calendar date or bookkeeping removed");
  // The author's ALWAYS rule is stronger than model prompting:
- // keep exactly the 18 approved forms, and never invent new grammar.
- const spoken=enforceMandatorySankoForms(smoothSankoSpeech(guarded.reply));
+ // keep exactly the 25 approved forms, and never invent new grammar.
+ const spoken=enforceMandatorySankoForms(smoothSankoSpeech(normalizeSankoFaith(guarded.reply)));
  if(literaryEquivalentsInSankoSpeech(spoken).length)
   console.error("Sanko mandatory forms invariant failed");
  await storeTurn(env,id,admission.id,question,spoken,generated.model,"answered");
