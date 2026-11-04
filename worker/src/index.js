@@ -13,10 +13,10 @@ import { primeWithSankoExamples } from "./sanko-dialogue-examples.js";
 import { guardSankoReply } from "./reply-guard.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 
-const VERSION="sanko-worker-0.6.1";
+const VERSION="sanko-worker-0.6.2";
 const MODEL_ORDER=[
- ["gemini-3.6-flash",18000],["gemini-3.5-flash-lite",16000],
- ["gemini-3.1-flash-lite",14000],["gemini-3.8-flash",12000]
+ ["gemini-3.5-flash-lite",18000],["gemini-3.1-flash-lite",14000],
+ ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
 ];
 const RETENTION_DAYS=30;
 
@@ -322,13 +322,9 @@ function systemText(runtime,scope,hits,today,diary) {
 }
 
 function modelList(env) {
- const names=shorten(env.GEMINI_MODEL_ORDER,400).split(",").map(x=>x.trim().toLowerCase())
+ const names=shorten(env.GEMINI_MODEL_ORDER,400).split(",").map(x=>x.trim())
    .filter(x=>/^[a-z0-9][a-z0-9._-]{2,90}$/.test(x)).slice(0,4);
- const configured=names.length?names.map((name,i)=>[name,MODEL_ORDER[i]?.[1]||14000]):MODEL_ORDER;
- // Prefer the already allowed stronger Free Tier Flash model for voice fidelity.
- // Respect explicitly configured allowlists that omit it.
- const preferred=configured.find(x=>x[0]==="gemini-3.6-flash");
- return preferred?[preferred,...configured.filter(x=>x!==preferred)]:configured;
+ return names.length?names.map((name,i)=>[name,MODEL_ORDER[i]?.[1]||12000]):MODEL_ORDER;
 }
 // Best-effort per-isolate cooldown for models that recently returned 429.
 // This does NOT claim to enforce a global quota or know its reset time.
