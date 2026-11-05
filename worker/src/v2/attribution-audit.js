@@ -38,6 +38,21 @@ function canonicalCorrection(approved){
   ", а Тицзюй на заставе — про "+officialPlace+".";
 }
 export function auditReplyAgainstFacts(reply,approved,question,history=[]){
+ // Two different author-approved sources at the same priority are a conflict,
+ // not a license to silently favor an arbitrary model utterance.
+ if(approved?.conflicts?.length)
+  return {reply:"Тута разнобой в сведениях. Не стану утверждать, покуда не разберусь.",
+   passed:false,violations:["approved_conflict"],action:"conflicting_canon_abstain"};
+ const q=trim(question);
+ const invertedUserAssertion=(boat.test(q)&&checkpoint.test(q)||
+   official.test(q)&&city.test(q))&&!/почему|отчего/iu.test(q);
+ // A visitor may confidently assert a FALSE route and the model may merely
+ // say "да". Validate the QUESTION as well as the proposed ANSWER.
+ if(invertedUserAssertion&&relevantQuestion(q,history)){
+  const correct=canonicalCorrection(approved);
+  if(correct)return {reply:correct,passed:true,violations:[],
+   action:"rejected_unverified_visitor_attribution"};
+ }
  const violations=incorrectSourceAttributions(reply,approved);
  if(violations.length){
   const correction=canonicalCorrection(approved);
@@ -46,7 +61,6 @@ export function auditReplyAgainstFacts(reply,approved,question,history=[]){
  }
  // When a visitor explicitly challenges a disputed source, avoid merely
  // accepting the visitor's assertion. Correct using AUTHOR evidence instead.
- const q=trim(question);
  const challenge=/(?:разве|ты\s+перепутал|не\s+(?:он|лодочник|тицзюй)\s+говорил|запутался)/iu.test(q);
  if(challenge&&relevantQuestion(q,history)){
   const correct=canonicalCorrection(approved);
