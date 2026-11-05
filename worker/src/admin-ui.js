@@ -265,6 +265,14 @@ export const ADMIN_SCRIPT = String.raw`
      for(const a of x.attempts){
       const tokens=a.totalTokens==null?"расход неизвестен":n(a.totalTokens)+" токенов";
       list.append(el("li",when(a.attemptedAt)+" · "+a.model+" · "+a.result+" · "+tokens));
+      const categories={
+       provider_region:"Google отклонил регион запроса. Смена модели Gemini не поможет.",
+       provider_precondition:"Не выполнено условие Google API; проверить доступность региона и биллинг.",
+       provider_invalid_request:"Google отклонил формат запроса; требуется проверка серверного кода.",
+       provider_auth:"Ошибка ключа или прав Google API; резервные модели с тем же ключом не помогут."
+      };
+      const category=String(a.result||"").split(":")[0];
+      if(categories[category])list.append(el("li",categories[category],"hint"));
      }
      item.append(list);
     } else if(x.status==="error"){
