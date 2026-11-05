@@ -1,0 +1,20 @@
+name: Sanko v2 — live canon gate
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check actual Worker version, fresh diary and source correctness
+        run: |
+          node quality/v2-live-canon-check.mjs
