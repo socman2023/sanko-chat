@@ -21,7 +21,6 @@ function sceneAnchor(history){
 }
 const gloss=/^(?:(?:чего|что|шо)\s+[«"'“]?\s*(?:опосля|покуда|дотуль|досель)\s*[»"'”]?\s*\??|что значит\s+[«"'“]?\s*(?:опосля|покуда|дотуль|досель)\s*[»"'”]?\s*\??)$/iu;
 const followup=/^(?:а потом|а дальше|и потом|и дальше|а почему|а где он|а где она|а что с ним|а что с ней|и что|и шо|почему|чего|что дальше)[\s!?.,…]*$/iu;
-const shortSceneContinuation=/^(?:а потом|и потом|а дальше|и дальше|что дальше)[\s!?.,…]*$/iu;
 const deep=/(?:подробн|во всех подробностях|по порядку|с самого начала|расскажи целиком|вспомни всё)/iu;
 const narrow=q=>String(q||"").trim();
 function previousTopic(history){
@@ -50,7 +49,7 @@ export function selectSankoContext(question,history=[],dateScope=null){
   recentPosts:1,topicPosts:0,useRetrieval:false,searchQuestion:q};
  if(isNews(q))return {kind:"current",profile:"compact",diary:"recent",
   recentPosts:4,topicPosts:0,useRetrieval:false,searchQuestion:q};
- const scene=(sceneFollowup.test(q)||shortSceneContinuation.test(q))?sceneAnchor(history):null;
+ const scene=sceneFollowup.test(q)?sceneAnchor(history):null;
  if(scene){
   // Keep four full, newest published posts and ask for a few source fragments
   // only if an actual user question identifies a concrete subject.
