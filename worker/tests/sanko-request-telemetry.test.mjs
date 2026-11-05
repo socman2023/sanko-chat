@@ -57,7 +57,7 @@ test("prompt breakdown measures each source independently without emitting its c
  assert.equal(b.profileChars,sources.profile.length);
  assert.equal(b.personalContextChars,sources.current.text.length);
  assert.equal(b.diaryChars,posts.map(x=>x.text.length).reduce((a,x)=>a+x,0));
- assert.equal(b.focusRepeatChars,posts[1].text.length);
+ assert.equal(b.focusRepeatChars,0,"No duplicated latest diary in optimized prompt");
  assert.equal(b.historyChars,history[0].text.length+history[1].text.length);
  assert.equal(b.diaryPosts,2);
  assert.equal(b.retrievedHits,1);
