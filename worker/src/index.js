@@ -519,13 +519,13 @@ async function chat(req,env,origin,ctx) {
  }
  let vectorHits=[];
  const vectorStarted=Date.now();
- try{vectorHits=await retrieve(env,policy.searchQuestion,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
+ if(policy.useRetrieval)try{vectorHits=await retrieve(env,policy.searchQuestion,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
  markChatStage(trace,"retrieve",Date.now()-vectorStarted);
  // Hybrid search: private complete archive in Sanko D1 + semantic Vectorize.
  // Canon records are never stored in, or read from, Oleshka's private KV/D1.
  let lexicalHits=[];
  const lexicalStarted=Date.now();
- try{lexicalHits=await canonLexical(env,policy.searchQuestion,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
+ if(policy.useRetrieval)try{lexicalHits=await canonLexical(env,policy.searchQuestion,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
  markChatStage(trace,"lexical",Date.now()-lexicalStarted);
  const seen=new Set();
  const hits=[];
