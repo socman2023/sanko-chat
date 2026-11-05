@@ -26,7 +26,8 @@ export async function parseChatBody(req){
  if(!message||message.length>CHAT_MAX_CHARS)throw Error("invalid_message");
  return {question:message,history:safeHistory(body.history),
   conversationId:cleanConversationId(body.conversationId),
-  vkLaunch:typeof body.vkLaunch==="string"?body.vkLaunch:""};
+  vkLaunch:typeof body.vkLaunch==="string"?body.vkLaunch:"",
+  openingGreeting:typeof body.openingGreeting==="string"?body.openingGreeting:""};
 }
 export function configured(env){
  return !!(env.CURRENT_CONTEXT?.get&&env.GUARD_DB?.prepare&&
