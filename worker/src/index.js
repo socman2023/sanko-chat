@@ -22,7 +22,7 @@ import { selectSankoContext,SANKO_COMPACT_IDENTITY } from "./context-selection.j
 import { newChatTrace,markChatStage,getPromptBreakdown,
  logGeminiAttempt,logChatFinished } from "./request-telemetry.js";
 
-const VERSION="sanko-worker-0.6.17";
+const VERSION="sanko-worker-0.6.18";
 // Public VK profile of Oleshka, distinct from Sanko’s Mini App and VK owner IDs.
 // Identity is used ONLY after verifying the signed VK launch on the server.
 const OLESHKA_VK_USER_ID=850667816;

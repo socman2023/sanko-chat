@@ -142,3 +142,70 @@ test("old news must not contaminate a new historical or family topic",()=>{
  assert.equal(p.profile,"full");
  assert.equal(p.useRetrieval,true);
 });
+
+
+test("seven actual prompts from 0.6.17 server logs select expected canon contexts",()=>{
+ const turns=[
+  ["Что нового у тебя?","Плывем по реке, догоняем баржу.", "current"],
+  ["Какую баржу?","Тюремную, там Руман и Элина.", "knowledge"],
+  ["Уже видали эту баржу?","Нема, покуда не нашли.", "knowledge"],
+  ["А откуда знаете, что в Лунцзин их везут?","Местный лодочник сказывал.", "knowledge"],
+  ["Так вроде на заставе вам еще кое-что сказали?","На заставе сказали кое-что.", "knowledge"],
+  ["Так может, их там высадят?","Ежли высадят, разлучить могут.", "scene-followup"],
+  ["Чаешь, успеете?","Треба успеть.", "scene-followup"]
+ ];
+ const history=[];
+ for(const [q,modelReply,expected]of turns){
+  const p=mode(q,history);
+  assert.equal(p.kind,expected,q);
+  if(expected==="current"){
+   assert.equal(p.useRetrieval,false);
+   assert.equal(p.recentPosts,4);
+   assert.equal(p.profile,"compact");
+  }else if(expected==="knowledge"){
+   assert.equal(p.profile,"full",q);
+   assert.equal(p.useRetrieval,true,q);
+   assert.equal(p.maxHits,undefined);
+  }else{
+   assert.equal(p.profile,"compact",q);
+   assert.equal(p.recentPosts,4,q);
+   assert.equal(p.useRetrieval,true,q);
+   assert.equal(p.maxHits,4,q);
+   assert.equal(p.searchQuestion,"Так вроде на заставе вам еще кое-что сказали?");
+   assert(!p.searchQuestion.includes("Ежли высадят"));
+  }
+  history.push({role:"user",text:q},{role:"model",text:modelReply});
+ }
+});
+
+test("common reordered news phrasings cannot fall into heavyweight knowledge mode",()=>{
+ for(const q of ["Что нового у тебя?","Что нового у вас?", "А что нового у тебя?",
+    "Ну, что нового у тебя?","У тебя что нового?","Ну, у вас шо нового?"]){
+  assert.equal(mode(q).kind,"current",q);
+ }
+ for(const q of ["Что нового у Румана?", "Что нового у отца?",
+   "Что нового ты знаешь о Лунцзине?"]){
+  assert.equal(mode(q).kind,"knowledge",q);
+ }
+});
+
+test("live-scene refinements never erase confirmed personal history after topic switch",()=>{
+ const switched=[
+  {role:"user",text:"Что нового у тебя?"},
+  {role:"model",text:"Плывем по реке"},
+  {role:"user",text:"Уже видел отца?"},
+  {role:"model",text:"Нема, пока"}
+ ];
+ for(const q of ["Так может, их там высадят?","Чаешь, успеете?"]){
+  const p=mode(q,switched);
+  assert.equal(p.kind,"knowledge",q);
+  assert.equal(p.profile,"full",q);
+ }
+ const historical=[
+  {role:"user",text:"Что нового у тебя?"},
+  {role:"model",text:"В дороге."},
+  {role:"user",text:"Расскажи про детство и прежние дела"},
+  {role:"model",text:"Расскажу."}
+ ];
+ assert.equal(mode("Чаешь, успеете?",historical).kind,"knowledge");
+});

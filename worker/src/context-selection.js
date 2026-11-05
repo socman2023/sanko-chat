@@ -3,24 +3,30 @@ const greeting=/^(?:привет(?:ик)?|здрав(?:ствуй(?:те)?| бу
 const social=/^(?:как дела(?: у тебя)?|как поживаешь|как ты|как сам|ты как|а у тебя|шо у тебя|чем занят|что делаешь|как настроение)[\s!?.,…]*$/iu;
 const current=/^(?:что(?: у вас)? нового|шо(?: у вас)? нового|какие новости|что сегодня было|что сегодня случилось|как идут дела|что у вас происходит|сам говори,? что было)[\s!?.,…]*$/iu;
 const conversationalNews=/^(?:(?:(?:ну|а|да|ты)[,\s]+)?(?:лучше\s+)?(?:скажи|расскажи)(?:\s+мне)?\s*[,;:]?\s+)?(?:что|шо)(?:\s+у\s+(?:тебя|вас))?\s+нового[\s!?.,…]*$/iu;
+const reorderedNews=/^(?:(?:ну|а)[,\s]+)?(?:что|шо)\s+нового\s+у\s+(?:тебя|вас)[\s!?.,…]*$/iu;
+const reversedNews=/^(?:(?:ну|а)[,\s]+)?у\s+(?:тебя|вас)\s+(?:что|шо)\s+нового[\s!?.,…]*$/iu;
+const tentativeLanding=/^(?:а\s+)?(?:так\s+)?(?:может\s*[,]?\s+)?(?:их\s+там|там\s+их)\s+высадят[\s!?.,…]*$/iu;
 // Only narrow present-scene continuations qualify for the inexpensive path.
 const sceneFollowup=/^(?:а\s+)?(?:там\s+(?:что|шо)\s+будет|(?:что|шо)\s+там\s+будет|(?:что|шо)\s+будет\s+дальше|(?:а\s+)?успеете|сумеете|чаешь[,\s]+успеете|думаешь[,\s]+успеете|как\s+думаешь[,\s]+успеете)[\s!?.,…]*$/iu;
 const presentCue=/(?:^|[^\p{L}])(?:сейчас|сегодня|нынче|ныне|ещё|еще|пока|уже)(?:$|[^\p{L}])/iu;
-const isNews=q=>current.test(q)||conversationalNews.test(q);
+const isNews=q=>current.test(q)||conversationalNews.test(q)||reorderedNews.test(q)||reversedNews.test(q);
 function sceneAnchor(history){
  if(!Array.isArray(history))return null;
  // Only previous USER questions authorize a search topic. Model replies
  // can resolve a pronoun conversationally, but can never become canon.
  const recent=history.filter(h=>h?.role==="user"&&typeof h.text==="string")
-  .slice(-4).map(h=>narrow(h.text));
+  .slice(-8).map(h=>narrow(h.text));
  if(!recent.some(x=>isNews(x)||presentCue.test(x)))return null;
+ // Skip speculative/short followups when locating a genuine USER topic:
+ // they are continuations, not a change of subject or a source of new facts.
  const topic=[...recent].reverse().find(x=>x.length>5&&!isNews(x)&&
   !greeting.test(x)&&!social.test(x)&&!followup.test(x)&&
-  !sceneFollowup.test(x));
- // An intervening historical/family question changes the subject. Keep
- // the full canon instead of carrying a stale news cue into another topic.
+  !sceneFollowup.test(x)&&!tentativeLanding.test(x));
+ // If the last substantive question is about family, history or biography,
+ // don't carry over an older news cue and silently drop those canonical facts.
+ const historical=/(?:отц|матер|матушк|семь[яи]|родител|детств|прошл|прежде|биограф)/iu;
  const liveStatus=/(?:^|[^\p{L}])(?:ещё|еще|пока|уже)(?:$|[^\p{L}])/iu;
- if(topic&&!liveStatus.test(topic))return null;
+ if(topic&&(historical.test(topic)||!liveStatus.test(topic)))return null;
  return {topic:topic||""};
 }
 const gloss=/^(?:(?:чего|что|шо)\s+[«"'“]?\s*(?:опосля|покуда|дотуль|досель)\s*[»"'”]?\s*\??|что значит\s+[«"'“]?\s*(?:опосля|покуда|дотуль|досель)\s*[»"'”]?\s*\??)$/iu;
@@ -34,7 +40,7 @@ function previousTopic(history){
   if(h?.role!=="user")continue;
   const text=narrow(h.text).slice(0,450);
   if(!text||greeting.test(text)||social.test(text)||isNews(text)||
-     gloss.test(text)||followup.test(text)||sceneFollowup.test(text))continue;
+     gloss.test(text)||followup.test(text)||sceneFollowup.test(text)||tentativeLanding.test(text))continue;
   return text;
  }
  return "";
@@ -53,7 +59,7 @@ export function selectSankoContext(question,history=[],dateScope=null){
   recentPosts:1,topicPosts:0,useRetrieval:false,searchQuestion:q};
  if(isNews(q))return {kind:"current",profile:"compact",diary:"recent",
   recentPosts:4,topicPosts:0,useRetrieval:false,searchQuestion:q};
- const scene=sceneFollowup.test(q)?sceneAnchor(history):null;
+ const scene=(sceneFollowup.test(q)||tentativeLanding.test(q))?sceneAnchor(history):null;
  if(scene){
   // Keep four full, newest published posts and ask for a few source fragments
   // only if an actual user question identifies a concrete subject.
