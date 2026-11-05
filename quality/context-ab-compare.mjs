@@ -78,6 +78,15 @@ const cases=[
 const results=[];
 for(const [kind,q,history] of cases){
  const before=await run(baseline,q,history),after=await run(candidate,q,history);
+ // Voice, religion, first-person identity and the distinction between
+ // witnessed and reported events must survive every optimization mode.
+ for(const constraint of ["Слава Вароку","ОБЯЗАТЕЛЬНО ДЛЯ СОБСТВЕННОЙ РЕЧИ",
+   "Поднебесье","НИКОГДА не произноси календарные даты"]){
+  if(!after.prompt.includes(constraint))
+   throw Error("Lost approved character constraint "+constraint+" in "+kind);
+ }
+ if(!after.prompt.includes(current)&&kind!=="dated")
+  throw Error("Lost latest approved personal snapshot in "+kind);
  const selected=posts.filter((p)=>after.prompt.includes("TEST_ONLY_CANON_SOURCE_"+(p.post_id-6000)));
  for(const p of selected)if(!after.prompt.includes("END_OF_COMPLETE_SOURCE_"+(p.post_id-6000)))
   throw Error("Truncated selected source "+p.post_id);
