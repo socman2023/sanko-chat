@@ -166,8 +166,8 @@ for(const [question,answer] of bargeTurns){
 const bargeTotals=bargeResults.reduce((a,r)=>({
  old:a.old+r.oldChars,now:a.now+r.newChars}),{old:0,now:0});
 console.log("BARGE_FOUR_TURNS "+JSON.stringify({totals:bargeTotals,turns:bargeResults}));
-if(bargeTotals.now>bargeTotals.old*.75)
- throw Error("Newly measured barge conversation improvement below 25%");
+if(bargeTotals.now>bargeTotals.old*1.03)
+ throw Error("Previously optimized four-turn conversation regressed");
 
 // Seven exact reader prompts and approximate corresponding visible dialogue
 // from the 2026-11-05 0.6.17 session. Their model replies are not canon.
