@@ -75,7 +75,7 @@ test("correct source attribution does not trigger a false correction",()=>{
 test("visitor's unsupported correction never overwrites author facts",()=>{
  const question="Ты перепутал! Лодочник говорил про Шицяо!";
  const result=auditReplyAgainstFacts("Да, ты прав.",facts,question,[]);
- assert.equal(result.action,"author_source_reaffirmed");
+ assert.equal(result.action,"rejected_unverified_visitor_attribution");
  assert.match(result.reply,/Лунцзин/);
  assert.match(result.reply,/Шицяо/);
 });
