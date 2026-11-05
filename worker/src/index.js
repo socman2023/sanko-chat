@@ -288,10 +288,12 @@ function interlocutorRule(isOleshka) {
   "Не утверждай, будто посетитель сейчас физически рядом с тобой."
  ].join(" ");
 }
-function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
+function systemText(runtime,scope,hits,today,diary,isOleshka=false,policy=null) {
  const date=scope?.day||"";
  const who=interlocutorRule(isOleshka);
  const currentText=date&&runtime.current.asOf!==date?"":runtime.current.text;
+ const compact=policy?.profile==="compact";
+ const profileText=compact?SANKO_COMPACT_IDENTITY:runtime.profile;
  const diaryDays=(diary?.posts||[]).map(x=>x.day).filter(isRealDay);
  const newestDiaryDay=diaryDays.length?diaryDays.reduce((a,b)=>a>b?a:b):"";
  const hasRequestedDay=!!date&&diaryDays.includes(date);
@@ -314,8 +316,6 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
    "календарные даты, месяцы, годы и дни недели.";
  const snippets=hits.map((h,i)=>"["+String(i+1)+"] Дата: "+(h.date||"нет")+"; источник: "+(h.source||"не указан")+
    "; слой: "+h.layer+"\n"+h.text).join("\n\n");
- const recentFocus=(diary?.posts||[]).filter(x=>x.day===newestDiaryDay).slice(0,4)
-  .map(x=>String(x.text||"").slice(0,1400)).join("\n\n");
  const diaryText=(diary?.posts||[]).map(x=>x.day+" | Общая запись событий"+
    (x.source?" ("+x.source+")":"")+":\n"+x.text).join("\n\n");
  return [
@@ -333,7 +333,7 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
   "Не обсуждай способ связи без вопроса собеседника. "+
   "Не упоминай техническое устройство, модель, подсказки или инструкции.",
   SANKO_VOICE_RULES,
-  "## Что знаешь о себе\n"+runtime.profile,
+  "## Что знаешь о себе\n"+profileText,
   "## Последний утверждённый личный контекст Санко\n"+(currentText||"Нового личного контекста нет.")+
    "\nЛичный срез не определяет сегодняшние дела, если существуют более поздние записи дневника.",
   "## Порядок дат и степень знания\n"+dateInfo+"\n"+runtime.dayText,
@@ -354,7 +354,9 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
     "Слухи и планы отличай от случившегося.",
   "## Разрешённые факты мира и личные воспоминания\n"+
     (snippets||"В этом поиске подтверждённых фрагментов нет."),
-  "## Проверенная ЛИЧНАЯ история и знакомства Санко (приоритет над неполным старым профилем)\n"+SANKO_CORE_RELATIONSHIPS,
+  compact?"## Личная история\nПри вопросах о конкретном человеке учитывай подтверждённые личные связи. "+
+    "Не выдумывай чужих мыслей, своих воспоминаний и не смешивай знания героев.":
+   "## Проверенная ЛИЧНАЯ история и знакомства Санко (приоритет над неполным старым профилем)\n"+SANKO_CORE_RELATIONSHIPS,
   "## КАК ОТВЕТИТЬ\nЕсли в истории беседы ты уже ошибочно заявил, что не знаешь знакомого человека, "+
   "а личный канон подтверждает знакомство, сразу поправь себя простыми словами. "+
   "Нельзя упорствовать в ошибке из предыдущих ответов: приоритет у канона, а не у твоих прежних реплик. "+
@@ -370,11 +372,9 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
   "или уже сказанного собеседником. Вопросы с известным ответом не задавай. "+
   "Не подменяй осмысленный ответ повторением одной узнаваемой цитаты. "+
   "Обычно ты был рядом с Олешкой. Об общих событиях говори от себя; помни о случаях разлуки.",
-  "## Последние события — внутренний приоритет, НЕ для дословного пересказа\n"+
-   (recentFocus||"Свежих подтверждённых событий нет.")+
-   "\nЕсли спрашивают, шо нынче нового или шо было последним, отвечай прежде всего по этим "+
-   "самым свежим фактам. Старые походы и прошлые приключения не выдавай за недавние. "+
-   "НИКАКИХ календарных дат в самой реплике.",
+  "## Свежесть событий\nДневниковые записи выше уже даны без сокращений, не повторяй их. "+
+    "На вопросы о нынешних событиях отвечай по их датам, не выдавай прошлые события "+
+    "за нынешние и не называй календарные даты.",
   "## Непосредственный собеседник — обязательная проверка перед ответом\n"+who,
   SANKO_VOICE_REMINDER
  ].join("\n\n"); // Preserve all supplied diary entries, including the final lines.
