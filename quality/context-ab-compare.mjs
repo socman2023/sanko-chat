@@ -95,6 +95,29 @@ for(const [kind,q,history] of cases){
   oldEmbeddings:before.stats.embeddings,newEmbeddings:after.stats.embeddings});
 }
 for(const result of results)console.log(JSON.stringify(result));
+// A complete eight-turn conversation with the SAME history on both Workers.
+// This detects unwanted compression of topical followups after small talk.
+const dialogue=[
+ "Привет","Как дела?","Что нового?","А где сейчас Руман?",
+ "А потом?","Чего «опосля»?","Расскажи про отца","А у тебя?"
+];
+const dialogueHistory=[],dialogueStats=[];
+for(const question of dialogue){
+ const old=await run(baseline,question,dialogueHistory);
+ const next=await run(candidate,question,dialogueHistory);
+ dialogueStats.push({turn:dialogueStats.length+1,question,
+  oldChars:old.prompt.length,newChars:next.prompt.length});
+ if(question==="А потом?"&&!next.prompt.includes(profile))
+  throw Error("Lost full profile during long-dialogue continuation");
+ if(question==="А у тебя?"&&!next.prompt.includes(profile))
+  throw Error("Lost subject continuity in social-looking followup");
+ dialogueHistory.push({role:"user",text:question},
+  {role:"model",text:"Здрав будь. Говори, шо спросить хотел."});
+}
+const dialogueTotals=dialogueStats.reduce((a,r)=>({
+ old:a.old+r.oldChars,now:a.now+r.newChars}),{old:0,now:0});
+console.log("MULTITURN_TOTALS "+JSON.stringify(dialogueTotals));
+
 const lines=["# Offline A/B — identical synthetic sources and questions","",
  "These are SYSTEM PROMPT CHARACTERS, not real Gemini token usage.",
  "No Gemini calls were made. A mock cannot certify the characters' actual replies.","",
@@ -103,7 +126,17 @@ const lines=["# Offline A/B — identical synthetic sources and questions","",
  ...results.map(r=>"| "+r.kind+" | "+r.oldChars+" | "+r.newChars+" | "+r.savedPct+"% | "+r.newPosts+" |"),
  "",
  "Full selected source texts and their ending markers were validated.",
- "For factual, continuation and dated cases the full approved profile remains present."];
+ "For factual, continuation and dated cases the full approved profile remains present.",
+ "",
+ "## Eight-turn connected conversation (same history on both Workers)",
+ "",
+ "| Turn | Question | Baseline chars | Candidate chars |",
+ "|---:|---|---:|---:|",
+ ...dialogueStats.map(r=>"| "+r.turn+" | "+r.question+" | "+r.oldChars+" | "+r.newChars+" |"),
+ "",
+ "Total baseline characters: "+dialogueTotals.old,
+ "Total experimental characters: "+dialogueTotals.now,
+ "Reduction: "+(100*(1-dialogueTotals.now/dialogueTotals.old)).toFixed(1)+"%"];
 writeFileSync("context-ab-results.md",lines.join("\n")+"\n");
 if(results.find(x=>x.kind==="greeting").savedPct<45)throw Error("Greeting reduction below threshold");
 if(results.find(x=>x.kind==="current").savedPct<25)throw Error("Current reduction below threshold");
