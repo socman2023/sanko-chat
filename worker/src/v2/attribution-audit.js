@@ -3,7 +3,7 @@
 import {sourceMap} from "./approved-ledger.js";
 const boat=/лодочн/iu,official=/тицзюй|тицзю[юя]/iu;
 const city=/лунцзин/iu,checkpoint=/шицяо/iu;
-const signals=/сказ|говор|толков|сообщ|узнал|слышал|откуда|разве|пута/iu;
+const signals=/сказ|говор|толков|сообщ|узнал|слышал|откуда|разве|пута|застав|про\s|о\s|—/iu;
 const trim=s=>String(s||"").trim();
 const clauses=s=>trim(s).split(/[\n.!?;,]+/u).map(x=>x.trim()).filter(Boolean);
 function assertion(clause,subject,wrongPlace){
