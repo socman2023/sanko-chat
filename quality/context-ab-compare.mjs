@@ -7,7 +7,7 @@ const [oldPath,newPath]=process.argv.slice(2);
 if(!oldPath||!newPath)throw Error("Need baseline and candidate Worker files");
 const [baseline,candidate]=await Promise.all([oldPath,newPath].map(async p=>(await import(pathToFileURL(resolve(p)).href)).default));
 const today=dayInMoscow(),yesterday=new Date(Date.parse(today+"T00:00:00Z")-86400000).toISOString().slice(0,10);
-const fill=(s,n)=>s+" ".repeat(Math.max(0,n-s.length));
+const fill=(s,n)=>s.repeat(Math.ceil(n/s.length)).slice(0,n);
 const profile=fill("TEST_ONLY_PROFILE",29090),current=fill("TEST_ONLY_CURRENT",3409);
 const posts=Array.from({length:12},(_,i)=>{
  const ending="END_OF_COMPLETE_SOURCE_"+i,tag=i<6?today:yesterday;
