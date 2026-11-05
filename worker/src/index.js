@@ -541,7 +541,11 @@ async function chat(req,env,origin,ctx) {
  const openingCue=openingConversationCue(body?.openingGreeting,history);
  const system=systemText(runtime,scope,hits,today,diary,isOleshka,policy)+openingCue+
   sankoClarificationCue(question,history);
- const prompt=getPromptBreakdown(runtime,hits,diary,system,history,question);
+ const measuredRuntime={...runtime,profile:policy.profile==="compact"?
+  SANKO_COMPACT_IDENTITY:runtime.profile};
+ const prompt=getPromptBreakdown(measuredRuntime,hits,diary,system,history,question);
+ prompt.contextMode=policy.kind;
+ prompt.fullProfileAvailableChars=runtime.profile.length;
  const generationStarted=Date.now();
  const generated=await answerWithGemini(env,system,history,question,trace);
  markChatStage(trace,"generation",Date.now()-generationStarted);
