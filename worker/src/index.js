@@ -18,6 +18,7 @@ import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
+import { PREVIEW_HTML,PREVIEW_JS } from "./preview-chat-page.js";
 import { selectSankoContext,SANKO_COMPACT_IDENTITY } from "./context-selection.js";
 import { newChatTrace,markChatStage,getPromptBreakdown,
  logGeminiAttempt,logChatFinished } from "./request-telemetry.js";
@@ -31,6 +32,24 @@ const MODEL_ORDER=[
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
 ];
 const RETENTION_DAYS=30;
+const PREVIEW_HOST_RE=/^[a-z0-9-]+-sanko-chat-api\.boysinger2008\.workers\.dev$/i;
+function previewHost(req) {
+ const u=new URL(req.url);
+ return u.protocol==="https:"&&PREVIEW_HOST_RE.test(u.hostname);
+}
+function previewResponse(body,type) {
+ return new Response(body,{status:200,headers:{"Content-Type":type,
+  "Cache-Control":"no-store","X-Robots-Tag":"noindex, nofollow",
+  "Content-Security-Policy":"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+}
+async function previewAuthorized(req,env) {
+ const supplied=req.headers.get("X-Preview-Token")||"";
+ const expected=String(env.ADMIN_UPDATE_TOKEN||"");
+ if(expected.length<32||supplied.length!==expected.length||supplied.length>512)return false;
+ const a=new TextEncoder().encode(supplied),b=new TextEncoder().encode(expected);
+ let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];
+ return diff===0;
+}
 
 function headers(origin,env) {
  return {"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store",
