@@ -1,0 +1,41 @@
+name: Sanko context A/B — offline, no deployment
+on:
+  pull_request:
+    paths:
+      - "worker/src/**"
+      - "worker/tests/**"
+      - "quality/context-ab-compare.mjs"
+      - ".github/workflows/context-ab-compare.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out experimental candidate
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+          persist-credentials: false
+      - name: Check out approved production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: baseline
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Replay identical fixtures against both Worker versions
+        run: |
+          node candidate/quality/context-ab-compare.mjs baseline/worker/src/index.js candidate/worker/src/index.js
+          cat context-ab-results.md
+      - name: Store comparison report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanko-context-ab-offline
+          path: context-ab-results.md
+          retention-days: 7
