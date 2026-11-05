@@ -50,7 +50,15 @@ export function composeSankoContext({plan,profile,current,diary,canon,approved,q
    "Найдены противоречивые утверждённые записи: "+
    approved.conflicts.map(x=>x.a+" / "+x.b).join(", ")+
    ". Не выбирай ни одно утверждение без нового авторского решения.");
- const factContent=factText(approved.facts,question+" "+plan.focus);
+ // Recent author-confirmed relations belong in current events, even when
+ // the user's wording is only "Что нового?". Do not keep dragging an old
+ // journey into unrelated news weeks later.
+ const recentFloor=new Date(Date.parse(dayToday+"T00:00:00Z")-
+  3*86400000).toISOString().slice(0,10);
+ const relevantFacts=plan.kind==="current"?
+  approved.facts.filter(x=>x.asOf>=recentFloor):approved.facts;
+ const factContent=factText(relevantFacts,question+" "+plan.focus+
+  (plan.kind==="current"?" баржа":""));
  if(factContent)add("Авторские подтверждённые отношения: ХТО сообщил ЧТО",factContent);
  const dated=!!plan.date;
  const currentText=dated&&current.asOf&&current.asOf!==plan.date?"":current.text;
