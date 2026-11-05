@@ -11,6 +11,7 @@ permissions:
   contents: read
 jobs:
   compare:
+    if: ${{ !startsWith(github.head_ref, 'rebuild/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
