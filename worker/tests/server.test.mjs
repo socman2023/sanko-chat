@@ -312,9 +312,10 @@ test("Gemini invalid payload and access denial do not spend fallback calls",asyn
   try{
    const response=await worker.fetch(req("Здрав будь, Санко"),env,ctx);
    assert.equal(response.status,503);
-   assert.equal((await response.json()).error,"service_unavailable");
+   const expected=httpStatus===400?"provider_invalid_request":"provider_auth";
+   assert.equal((await response.json()).error,expected);
    assert.equal(calls,1,"Non-retryable HTTP "+httpStatus+" must not cascade");
-   assert.equal(observed.usageInserts[0].values[4],"service_unavailable:"+httpStatus);
+   assert.equal(observed.usageInserts[0].values[4],expected+":"+httpStatus);
   }finally{globalThis.fetch=previous;}
  }
 });
