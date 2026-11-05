@@ -17,6 +17,10 @@ function sceneAnchor(history){
  const topic=[...recent].reverse().find(x=>x.length>5&&!isNews(x)&&
   !greeting.test(x)&&!social.test(x)&&!followup.test(x)&&
   !sceneFollowup.test(x));
+ // An intervening historical/family question changes the subject. Keep
+ // the full canon instead of carrying a stale news cue into another topic.
+ const liveStatus=/(?:^|[^\p{L}])(?:ещё|еще|пока|уже)(?:$|[^\p{L}])/iu;
+ if(topic&&!liveStatus.test(topic))return null;
  return {topic:topic||""};
 }
 const gloss=/^(?:(?:чего|что|шо)\s+[«"'“]?\s*(?:опосля|покуда|дотуль|досель)\s*[»"'”]?\s*\??|что значит\s+[«"'“]?\s*(?:опосля|покуда|дотуль|досель)\s*[»"'”]?\s*\??)$/iu;
