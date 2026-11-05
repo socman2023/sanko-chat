@@ -129,3 +129,16 @@ test("no untrusted assistant utterance may become a canonical search topic",()=>
  assert.equal(p.useRetrieval,false);
  assert(!p.searchQuestion.includes("Выдуманный корабль"));
 });
+
+test("old news must not contaminate a new historical or family topic",()=>{
+ const h=[
+  {role:"user",text:"Что нового?"},
+  {role:"model",text:"Есть новости о походе."},
+  {role:"user",text:"Расскажи про своего отца."},
+  {role:"model",text:"Мой отец..." }
+ ];
+ const p=mode("Чаешь, успеете?",h);
+ assert.equal(p.kind,"knowledge");
+ assert.equal(p.profile,"full");
+ assert.equal(p.useRetrieval,true);
+});
