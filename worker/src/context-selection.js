@@ -33,6 +33,10 @@ export function selectSankoContext(question,history=[],dateScope=null){
  if(current.test(q))return {kind:"current",profile:"compact",diary:"recent",
   recentPosts:2,topicPosts:0,useRetrieval:false,searchQuestion:q};
  const searchQuestion=followup.test(q)&&oldTopic?(oldTopic+" "+q).slice(0,700):q;
+ // Ambiguous continuations must retain the current-day sequence in full:
+ // a relevant fact may be in the final paragraph of a long diary post.
+ if(followup.test(q))return {kind:"continuation",profile:"full",diary:"continuation",
+  recentPosts:0,topicPosts:5,useRetrieval:true,searchQuestion};
  if(deep.test(q))return {kind:"detailed",profile:"full",diary:"topical",
   recentPosts:3,topicPosts:10,useRetrieval:true,searchQuestion};
  return {kind:"knowledge",profile:"full",diary:"topical",
