@@ -519,13 +519,13 @@ async function chat(req,env,origin,ctx) {
  }
  let vectorHits=[];
  const vectorStarted=Date.now();
- try{vectorHits=await retrieve(env,question,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
+ try{vectorHits=await retrieve(env,policy.searchQuestion,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
  markChatStage(trace,"retrieve",Date.now()-vectorStarted);
  // Hybrid search: private complete archive in Sanko D1 + semantic Vectorize.
  // Canon records are never stored in, or read from, Oleshka's private KV/D1.
  let lexicalHits=[];
  const lexicalStarted=Date.now();
- try{lexicalHits=await canonLexical(env,question,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
+ try{lexicalHits=await canonLexical(env,policy.searchQuestion,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
  markChatStage(trace,"lexical",Date.now()-lexicalStarted);
  const seen=new Set();
  const hits=[];
@@ -536,10 +536,10 @@ async function chat(req,env,origin,ctx) {
   if(hits.length>=12)break;
  }
  const diaryStarted=Date.now();
- const diary=await loadPublishedDiary(env,scope,question);
+ const diary=await loadPublishedDiary(env,scope,policy.searchQuestion,policy);
  markChatStage(trace,"diary",Date.now()-diaryStarted);
  const openingCue=openingConversationCue(body?.openingGreeting,history);
- const system=systemText(runtime,scope,hits,today,diary,isOleshka)+openingCue+
+ const system=systemText(runtime,scope,hits,today,diary,isOleshka,policy)+openingCue+
   sankoClarificationCue(question,history);
  const prompt=getPromptBreakdown(runtime,hits,diary,system,history,question);
  const generationStarted=Date.now();
