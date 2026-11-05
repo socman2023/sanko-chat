@@ -22,7 +22,7 @@ import { selectSankoContext,SANKO_COMPACT_IDENTITY } from "./context-selection.j
 import { newChatTrace,markChatStage,getPromptBreakdown,
  logGeminiAttempt,logChatFinished } from "./request-telemetry.js";
 
-const VERSION="sanko-worker-0.6.16";
+const VERSION="sanko-worker-0.6.17";
 // Public VK profile of Oleshka, distinct from Sanko’s Mini App and VK owner IDs.
 // Identity is used ONLY after verifying the signed VK launch on the server.
 const OLESHKA_VK_USER_ID=850667816;
@@ -128,16 +128,16 @@ async function expireOld(env) {
     .bind(Math.floor(Date.now()/1000)-95*86400).run();
  }catch(err){console.warn("Sanko cleanup failed",err?.name);}
 }
-async function retrieve(env,question,scope) {
+async function retrieve(env,question,scope,maxHits=7) {
  if(/^(привет|здрав будь|здравствуй|как дела|что нового)[!?. ]*$/iu.test(question))return [];
  const embedded=await env.AI.run(EMBEDDING_MODEL,{text:[question.slice(0,1200)]});
  const vector=embedded?.data?.[0];
  if(!Array.isArray(vector)||vector.length!==1024)throw Error("invalid_embedding");
  const filter=strictCharacterFilter(scope?.day||"");
  const found=await env.KNOWLEDGE.query(vector,{
-  topK:12,returnMetadata:"all",returnValues:false,filter
+  topK:maxHits<=4?8:12,returnMetadata:"all",returnValues:false,filter
  });
- return safeVectorMatches(found?.matches||[],{date:scope?.day||"",max:7});
+ return safeVectorMatches(found?.matches||[],{date:scope?.day||"",max:maxHits});
 }
 // Diary is the SAME public VK journal ingested by Oleshka's existing 3-hour Cron.
 // DIARY_DB points to the existing heroes-chat-guard D1: no second updater needed.
@@ -525,21 +525,21 @@ async function chat(req,env,origin,ctx) {
  }
  let vectorHits=[];
  const vectorStarted=Date.now();
- if(policy.useRetrieval)try{vectorHits=await retrieve(env,policy.searchQuestion,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
+ if(policy.useRetrieval)try{vectorHits=await retrieve(env,policy.searchQuestion,scope,policy.vectorLimit||7);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
  markChatStage(trace,"retrieve",Date.now()-vectorStarted);
  // Hybrid search: private complete archive in Sanko D1 + semantic Vectorize.
  // Canon records are never stored in, or read from, Oleshka's private KV/D1.
  let lexicalHits=[];
  const lexicalStarted=Date.now();
- if(policy.useRetrieval)try{lexicalHits=await canonLexical(env,policy.searchQuestion,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
+ if(policy.useRetrieval)try{lexicalHits=await canonLexical(env,policy.searchQuestion,policy.lexicalLimit||6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
  markChatStage(trace,"lexical",Date.now()-lexicalStarted);
  const seen=new Set();
  const hits=[];
- for(const hit of [...lexicalHits.slice(0,5),...vectorHits]) {
+ for(const hit of [...lexicalHits.slice(0,Math.min(5,policy.lexicalLimit||5)),...vectorHits]) {
   const key=String(hit.id||hit.source+"|"+hit.text.slice(0,120));
   if(seen.has(key))continue;
   seen.add(key);hits.push(hit);
-  if(hits.length>=12)break;
+  if(hits.length>=(policy.maxHits||12))break;
  }
  const diaryStarted=Date.now();
  const diary=await loadPublishedDiary(env,scope,policy.searchQuestion,policy);
