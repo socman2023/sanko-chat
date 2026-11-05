@@ -64,7 +64,7 @@ async function run(worker,question,history=[]){
  console.info=()=>{};
  try{
   const response=await worker.fetch(req,env,{waitUntil(p){p?.catch(()=>{});}});
-  if(response.status!==200)throw Error("HTTP "+response.status);
+  if(response.status!==200)throw Error("HTTP "+response.status+" "+JSON.stringify(await response.json())+" for "+question);
   const answer=await response.json();
   return {prompt,stats,posts:answer.knowledge.diaryPosts};
  }finally{globalThis.fetch=oldFetch;console.info=oldLog;}
