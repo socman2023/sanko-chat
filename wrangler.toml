@@ -1,7 +1,7 @@
 # GitHub-connected Cloudflare Worker for Sanko only.
-# Entry point remains in worker/src/. Do not deploy over Oleshka Worker.
+# Rebuilt canon-first entry point. Admin/session and private D1 bindings retained.
 name = "sanko-chat-api"
-main = "worker/src/index.js"
+main = "worker/src/v2/index.js"
 compatibility_date = "2026-10-31"
 workers_dev = true
 # Preserve VK_OWNER_USER_ID and other dashboard variables between GitHub deployments.
