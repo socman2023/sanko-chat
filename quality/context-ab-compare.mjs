@@ -85,7 +85,7 @@ for(const [kind,q,history] of cases){
   throw Error("Full profile missing for "+kind);
  if(kind==="greeting"&&(selected.length||after.stats.embeddings))
   throw Error("Unnecessary knowledge lookup for greeting");
- if(kind==="current"&&selected.length<2)throw Error("Lost recent entries");
+ if(kind==="current"&&selected.length<4)throw Error("Lost recent entries");
  if(kind==="dated"&&selected.length<6)throw Error("Explicit day lost entries");
  if(kind==="person"&&!after.prompt.toLowerCase().includes("руман"))
   throw Error("No topical Ruman evidence");
