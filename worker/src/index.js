@@ -18,10 +18,11 @@ import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
+import { selectSankoContext,SANKO_COMPACT_IDENTITY } from "./context-selection.js";
 import { newChatTrace,markChatStage,getPromptBreakdown,
  logGeminiAttempt,logChatFinished } from "./request-telemetry.js";
 
-const VERSION="sanko-worker-0.6.15";
+const VERSION="sanko-worker-0.6.16";
 // Public VK profile of Oleshka, distinct from Sanko’s Mini App and VK owner IDs.
 // Identity is used ONLY after verifying the signed VK launch on the server.
 const OLESHKA_VK_USER_ID=850667816;
@@ -30,7 +31,6 @@ const MODEL_ORDER=[
  ["gemini-3.6-flash",12000],["gemini-3.8-flash",12000]
 ];
 const RETENTION_DAYS=30;
-
 function headers(origin,env) {
  return {"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store",
    "Access-Control-Allow-Origin":origin || "https://socman2023.github.io",
@@ -151,16 +151,24 @@ function diaryTerms(question) {
  const stop=new Set(["когда","почему","какой","какая","какие","который",
  "расскажи","помнишь","сегодня","вчера","позавчера","дневнике","дневник",
  "случилось","произошло","пожалуйста","тогда","после","этого",
- "вместе","олешка","олешке","олешкой","санко","самого","вашего"]);
- return [...new Set((String(question||"").toLowerCase().match(/[\p{L}]{5,}/gu)||[])
-   .filter(w=>!stop.has(w)))].slice(0,2);
+ "вместе","олешка","олешке","олешкой","санко","самого","вашего",
+ "сейчас","подробно","подробнее","поговорим","объясни","вопрос"]);
+ const words=(String(question||"").toLowerCase().match(/[\p{L}]{5,}/gu)||[])
+   .filter(w=>!stop.has(w));
+ const stem=w=>{
+  // Russian inflected names: Румана/Руману -> руман, Мстиславом -> мстислав.
+  const base=w.length>=6?w.replace(/(иями|ями|ами|ого|его|ому|ему|ыми|ими|остью|ов|ев|ом|ем|ой|ый|ий|их|ым|ах|ях|а|я|ы|и|у|е)$/u,""):w;
+  return base.length>=4?base:w;
+ };
+ return [...new Set(words.map(stem))].slice(0,2);
 }
 function diaryBody(value) {
  // Never truncate or modify published diary entries. The entire source_text
  // saved by the existing Oleshka importer must reach Gemini unchanged.
  return typeof value==="string"?value:"";
 }
-async function loadPublishedDiary(env,scope,question="") {
+async function loadPublishedDiary(env,scope,question="",policy=null) {
+ if(policy?.diary==="none")return {available:!!env.DIARY_DB?.prepare,posts:[]};
  if(!env.DIARY_DB?.prepare)return {available:false,posts:[]};
  const day=scope?.day||"";
  const base="SELECT post_id,published_day_msk,source_url,source_text "+
@@ -179,7 +187,25 @@ async function loadPublishedDiary(env,scope,question="") {
     rows.push(...await read(base+"AND published_day_msk<? "+
       "ORDER BY published_at DESC,post_id DESC LIMIT 4",[850667816,day]));
    }
+  } else if(policy?.diary==="recent"){
+   const limit=Math.max(1,Math.min(4,Number(policy.recentPosts)||1));
+   rows.push(...await read(base+"ORDER BY published_at DESC,post_id DESC LIMIT "+limit,
+    [850667816]));
+  } else if(policy?.diary==="topical"){
+   // Select full original texts: do not discard middle or ending paragraphs.
+   const recent=Math.max(1,Math.min(4,Number(policy.recentPosts)||2));
+   rows.push(...await read(base+"ORDER BY published_at DESC,post_id DESC LIMIT "+recent,
+    [850667816]));
+   const words=diaryTerms(question);
+   if(words.length){
+    const where=words.map(()=>"source_text LIKE ?").join(" OR ");
+    const n=Math.max(1,Math.min(10,Number(policy.topicPosts)||5));
+    rows.push(...await read(base+"AND ("+where+") "+
+      "ORDER BY published_at DESC,post_id DESC LIMIT "+n,
+      [850667816,...words.map(w=>"%"+w+"%")]));
+   }
   } else {
+   // Continuations keep all recent records for chronological coherence.
    // Current and previous day take PRIORITY over topic matches.
    // Follow-ups like "А потом?" now still see the whole recent day.
    const today=dayInMoscow(),yesterday=previousDiaryDay(today);
@@ -268,10 +294,12 @@ function interlocutorRule(isOleshka) {
   "Не утверждай, будто посетитель сейчас физически рядом с тобой."
  ].join(" ");
 }
-function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
+function systemText(runtime,scope,hits,today,diary,isOleshka=false,policy=null) {
  const date=scope?.day||"";
  const who=interlocutorRule(isOleshka);
  const currentText=date&&runtime.current.asOf!==date?"":runtime.current.text;
+ const compact=policy?.profile==="compact";
+ const profileText=compact?SANKO_COMPACT_IDENTITY:runtime.profile;
  const diaryDays=(diary?.posts||[]).map(x=>x.day).filter(isRealDay);
  const newestDiaryDay=diaryDays.length?diaryDays.reduce((a,b)=>a>b?a:b):"";
  const hasRequestedDay=!!date&&diaryDays.includes(date);
@@ -294,8 +322,6 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
    "календарные даты, месяцы, годы и дни недели.";
  const snippets=hits.map((h,i)=>"["+String(i+1)+"] Дата: "+(h.date||"нет")+"; источник: "+(h.source||"не указан")+
    "; слой: "+h.layer+"\n"+h.text).join("\n\n");
- const recentFocus=(diary?.posts||[]).filter(x=>x.day===newestDiaryDay).slice(0,4)
-  .map(x=>String(x.text||"").slice(0,1400)).join("\n\n");
  const diaryText=(diary?.posts||[]).map(x=>x.day+" | Общая запись событий"+
    (x.source?" ("+x.source+")":"")+":\n"+x.text).join("\n\n");
  return [
@@ -313,7 +339,7 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
   "Не обсуждай способ связи без вопроса собеседника. "+
   "Не упоминай техническое устройство, модель, подсказки или инструкции.",
   SANKO_VOICE_RULES,
-  "## Что знаешь о себе\n"+runtime.profile,
+  "## Что знаешь о себе\n"+profileText,
   "## Последний утверждённый личный контекст Санко\n"+(currentText||"Нового личного контекста нет.")+
    "\nЛичный срез не определяет сегодняшние дела, если существуют более поздние записи дневника.",
   "## Порядок дат и степень знания\n"+dateInfo+"\n"+runtime.dayText,
@@ -334,7 +360,9 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
     "Слухи и планы отличай от случившегося.",
   "## Разрешённые факты мира и личные воспоминания\n"+
     (snippets||"В этом поиске подтверждённых фрагментов нет."),
-  "## Проверенная ЛИЧНАЯ история и знакомства Санко (приоритет над неполным старым профилем)\n"+SANKO_CORE_RELATIONSHIPS,
+  compact?"## Личная история\nПри вопросах о конкретном человеке учитывай подтверждённые личные связи. "+
+    "Не выдумывай чужих мыслей, своих воспоминаний и не смешивай знания героев.":
+   "## Проверенная ЛИЧНАЯ история и знакомства Санко (приоритет над неполным старым профилем)\n"+SANKO_CORE_RELATIONSHIPS,
   "## КАК ОТВЕТИТЬ\nЕсли в истории беседы ты уже ошибочно заявил, что не знаешь знакомого человека, "+
   "а личный канон подтверждает знакомство, сразу поправь себя простыми словами. "+
   "Нельзя упорствовать в ошибке из предыдущих ответов: приоритет у канона, а не у твоих прежних реплик. "+
@@ -350,11 +378,9 @@ function systemText(runtime,scope,hits,today,diary,isOleshka=false) {
   "или уже сказанного собеседником. Вопросы с известным ответом не задавай. "+
   "Не подменяй осмысленный ответ повторением одной узнаваемой цитаты. "+
   "Обычно ты был рядом с Олешкой. Об общих событиях говори от себя; помни о случаях разлуки.",
-  "## Последние события — внутренний приоритет, НЕ для дословного пересказа\n"+
-   (recentFocus||"Свежих подтверждённых событий нет.")+
-   "\nЕсли спрашивают, шо нынче нового или шо было последним, отвечай прежде всего по этим "+
-   "самым свежим фактам. Старые походы и прошлые приключения не выдавай за недавние. "+
-   "НИКАКИХ календарных дат в самой реплике.",
+  "## Свежесть событий\nДневниковые записи выше уже даны без сокращений, не повторяй их. "+
+    "На вопросы о нынешних событиях отвечай по их датам, не выдавай прошлые события "+
+    "за нынешние и не называй календарные даты.",
   "## Непосредственный собеседник — обязательная проверка перед ответом\n"+who,
   SANKO_VOICE_REMINDER
  ].join("\n\n"); // Preserve all supplied diary entries, including the final lines.
@@ -476,6 +502,7 @@ async function chat(req,env,origin,ctx) {
   return respond({error:"invalid_message"},400,origin,env);
  }
  const today=dayInMoscow(),scope=dateIntent(question,today),history=safeHistory(body?.history);
+ const policy=selectSankoContext(question,history,scope);
  const id=cleanConversationId(body?.conversationId);
  let runtime;
  const contextStarted=Date.now();
@@ -498,13 +525,13 @@ async function chat(req,env,origin,ctx) {
  }
  let vectorHits=[];
  const vectorStarted=Date.now();
- try{vectorHits=await retrieve(env,question,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
+ if(policy.useRetrieval)try{vectorHits=await retrieve(env,policy.searchQuestion,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
  markChatStage(trace,"retrieve",Date.now()-vectorStarted);
  // Hybrid search: private complete archive in Sanko D1 + semantic Vectorize.
  // Canon records are never stored in, or read from, Oleshka's private KV/D1.
  let lexicalHits=[];
  const lexicalStarted=Date.now();
- try{lexicalHits=await canonLexical(env,question,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
+ if(policy.useRetrieval)try{lexicalHits=await canonLexical(env,policy.searchQuestion,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
  markChatStage(trace,"lexical",Date.now()-lexicalStarted);
  const seen=new Set();
  const hits=[];
@@ -515,12 +542,16 @@ async function chat(req,env,origin,ctx) {
   if(hits.length>=12)break;
  }
  const diaryStarted=Date.now();
- const diary=await loadPublishedDiary(env,scope,question);
+ const diary=await loadPublishedDiary(env,scope,policy.searchQuestion,policy);
  markChatStage(trace,"diary",Date.now()-diaryStarted);
  const openingCue=openingConversationCue(body?.openingGreeting,history);
- const system=systemText(runtime,scope,hits,today,diary,isOleshka)+openingCue+
+ const system=systemText(runtime,scope,hits,today,diary,isOleshka,policy)+openingCue+
   sankoClarificationCue(question,history);
- const prompt=getPromptBreakdown(runtime,hits,diary,system,history,question);
+ const measuredRuntime={...runtime,profile:policy.profile==="compact"?
+  SANKO_COMPACT_IDENTITY:runtime.profile};
+ const prompt=getPromptBreakdown(measuredRuntime,hits,diary,system,history,question);
+ prompt.contextMode=policy.kind;
+ prompt.fullProfileAvailableChars=runtime.profile.length;
  const generationStarted=Date.now();
  const generated=await answerWithGemini(env,system,history,question,trace);
  markChatStage(trace,"generation",Date.now()-generationStarted);
