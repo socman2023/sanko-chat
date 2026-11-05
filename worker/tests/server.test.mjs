@@ -1091,3 +1091,43 @@ test("screenshot regression: first turn loses meaningless опосля; follow-u
   assert.equal(observed.insertions.length,3,"Three turns persisted");
  }finally{globalThis.fetch=old;}
 });
+
+
+test("Gemini region failure is recorded distinctly from broken requests, without trying other Gemini models",async()=>{
+ const {env,observed}=envStub(),previous=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=async()=>{
+  calls++;
+  return new Response(JSON.stringify({error:{
+   code:400,status:"FAILED_PRECONDITION",
+   message:"User location is not supported for the API use."
+  }}),{status:400});
+ };
+ try{
+  const response=await worker.fetch(req("Привет"),env,ctx);
+  assert.equal(response.status,503);
+  const body=await response.json();
+  assert.equal(body.error,"provider_region");
+  assert(!JSON.stringify(body).includes("location"),"Upstream text stays private");
+  assert.equal(calls,1,"Region denial cannot be repaired by switching Gemini model");
+  assert.equal(observed.usageInserts[0].values[4],"provider_region:400");
+  assert.equal(observed.insertions.length,1);
+ }finally{globalThis.fetch=previous;}
+});
+
+test("Gemini 400 failed precondition unrelated to region remains separately identifiable",async()=>{
+ const {env,observed}=envStub(),previous=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=async()=>{
+  calls++;
+  return new Response(JSON.stringify({error:{code:400,status:"FAILED_PRECONDITION",
+   message:"Billing is required."}}),{status:400});
+ };
+ try{
+  const response=await worker.fetch(req("Здорово"),env,ctx);
+  assert.equal(response.status,503);
+  assert.equal((await response.json()).error,"provider_precondition");
+  assert.equal(calls,1);
+  assert.equal(observed.usageInserts[0].values[4],"provider_precondition:400");
+ }finally{globalThis.fetch=previous;}
+});
