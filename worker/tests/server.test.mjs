@@ -169,15 +169,13 @@ test("Undated query consults older published diary entries by topic and latest p
  try{
   const r=await worker.fetch(req("А что там было с Мстиславом?"),env,ctx);
   assert.equal(r.status,200);
-  assert.equal(requests.length,4);
+  assert.equal(requests.length,2,"Latest diary plus topic only: no bulk yesterday loading");
   assert(requests.every(x=>x.sql.startsWith("SELECT ")));
   assert(requests.every(x=>!/\b(?:UPDATE|DELETE|INSERT)\b/i.test(x.sql)));
-  assert.match(requests[0].sql,/published_day_msk/);
-  assert.deepEqual(requests[0].values,[850667816,dayInMoscow()]);
-  assert.match(requests[1].sql,/published_day_msk/);
-  assert.match(requests[2].sql,/source_text LIKE/);
-  assert.deepEqual(requests[2].values,[850667816,"%мстиславом%"]);
-  assert.deepEqual(requests[3].values,[850667816]);
+  assert.match(requests[0].sql,/LIMIT 2/);
+  assert.deepEqual(requests[0].values,[850667816]);
+  assert.match(requests[1].sql,/source_text LIKE/);
+  assert.deepEqual(requests[1].values,[850667816,"%мстислав%"]);
   assert.equal((await r.json()).knowledge.diaryPosts,1);
  }finally{globalThis.fetch=oldFetch;}
 });

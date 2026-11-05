@@ -29,7 +29,7 @@ export function getPromptBreakdown(runtime,hits,diary,system,history,question){
   personalContextChars:length(runtime?.current?.text),
   chronologyChars:length(runtime?.dayText),
   diaryChars:posts.reduce((sum,p)=>sum+length(p.text),0),
-  focusRepeatChars:focus.reduce((sum,p)=>sum+Math.min(length(p.text),1400),0),
+  focusRepeatChars:0, // Duplicate `recentFocus` removed in experimental builder.
   retrievedChars:snippets.reduce((sum,p)=>sum+length(p.text),0),
   historyChars:turns.reduce((sum,p)=>sum+length(p.text),0),
   questionChars:length(question),diaryPosts:posts.length,retrievedHits:snippets.length,
