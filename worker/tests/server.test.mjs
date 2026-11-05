@@ -175,7 +175,7 @@ test("Undated query consults older published diary entries by topic and latest p
   assert.match(requests[0].sql,/LIMIT 2/);
   assert.deepEqual(requests[0].values,[850667816]);
   assert.match(requests[1].sql,/source_text LIKE/);
-  assert.deepEqual(requests[1].values,[850667816,"%мстиславом%"]);
+  assert.deepEqual(requests[1].values,[850667816,"%мстислав%"]);
   assert.equal((await r.json()).knowledge.diaryPosts,1);
  }finally{globalThis.fetch=oldFetch;}
 });
