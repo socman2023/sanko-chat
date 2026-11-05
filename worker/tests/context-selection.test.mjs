@@ -60,3 +60,72 @@ test("detailed questions retain full profile and more complete topical entries",
  assert.match(SANKO_COMPACT_IDENTITY,/Санко/);
  assert.match(SANKO_COMPACT_IDENTITY,/Олешка/);
 });
+
+test("real user's natural news formulation uses current canon instead of full profile",()=>{
+ for(const q of [
+  "Лучше скажи, что у тебя нового?",
+  "Ты лучше скажи, что у тебя нового?",
+  "А скажи, что у вас нового?",
+  "Ну, расскажи, шо у тебя нового."
+ ]){
+  const p=mode(q);
+  assert.equal(p.kind,"current",q);
+  assert.equal(p.profile,"compact");
+  assert.equal(p.diary,"recent");
+  assert.equal(p.recentPosts,4);
+  assert.equal(p.useRetrieval,false);
+ }
+});
+
+test("real barge conversation short scene questions use limited canon with source provenance",()=>{
+ const h=[
+  {role:"user",text:"Лучше скажи, что у тебя нового?"},
+  {role:"model",text:"Плывем по реке на джонке, за баржей следим."},
+  {role:"user",text:"Баржу еще не видели?"},
+  {role:"model",text:"Одну приметили, да не ту."}
+ ];
+ const third=mode("А там что будет?",h);
+ assert.equal(third.kind,"scene-followup");
+ assert.equal(third.profile,"compact");
+ assert.equal(third.diary,"recent");
+ assert.equal(third.recentPosts,4);
+ assert.equal(third.lexicalLimit,2);
+ assert.equal(third.vectorLimit,4);
+ assert.equal(third.maxHits,4);
+ assert.equal(third.useRetrieval,true);
+ assert.equal(third.searchQuestion,"Баржу еще не видели?");
+ assert(!third.searchQuestion.includes("Одну приметили"));
+ const fourth=mode("Чаешь, успеете?",[
+  ...h,{role:"user",text:"А там что будет?"},
+  {role:"model",text:"Там невольников высадят, опосля дальше поведут."}
+ ]);
+ assert.equal(fourth.kind,"scene-followup");
+ assert.equal(fourth.searchQuestion,"Баржу еще не видели?");
+ assert(!fourth.searchQuestion.includes("невольников высадят"));
+});
+
+test("unanchored pronouns, historical questions, why questions remain conservatively factual",()=>{
+ const old=[{role:"user",text:"Расскажи про свою семью"},
+  {role:"model",text:"Мне есть что рассказать."}];
+ for(const q of ["А там что будет?","Чаешь, успеете?"]){
+  assert.equal(mode(q,old).kind,"knowledge");
+  assert.equal(mode(q,old).profile,"full");
+ }
+ const live=[{role:"user",text:"Что у тебя нового?"},
+  {role:"model",text:"Есть новости."}];
+ for(const q of ["А почему?","А где Руман?","Расскажи подробно о семье"]){
+  assert.equal(mode(q,live).profile,"full",q);
+ }
+ assert.equal(mode("А там что будет?",live,{day:"2026-11-05"}).kind,"dated");
+});
+
+test("no untrusted assistant utterance may become a canonical search topic",()=>{
+ const h=[
+  {role:"user",text:"Что нового?"},
+  {role:"model",text:"Выдуманный корабль причалил вчера."}
+ ];
+ const p=mode("Чаешь, успеете?",h);
+ assert.equal(p.kind,"scene-followup");
+ assert.equal(p.useRetrieval,false);
+ assert(!p.searchQuestion.includes("Выдуманный корабль"));
+});
