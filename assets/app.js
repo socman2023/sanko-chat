@@ -316,6 +316,7 @@
         pending.remove(); userNode.remove();
         input.value = question; resize();
         const allowed = ['provider_quota','provider_busy','model_unavailable','service_unavailable',
+          'provider_region','provider_precondition','provider_invalid_request','provider_auth',
           'response_blocked'].includes(data?.error);
         addNotice(allowed && typeof data?.reply === 'string' && data.reply.trim() ?
           data.reply : FAILURE_NOTICE);
