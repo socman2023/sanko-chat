@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {resolveApprovedFacts,factText,approvedFactsFromKV,sourceMap} from "../src/v2/approved-ledger.js";
 import {incorrectSourceAttributions,auditReplyAgainstFacts} from "../src/v2/attribution-audit.js";
-import {planDialogue,trueConversation} from "../src/v2/dialogue-plan.js";
+import {planDialogue} from "../src/v2/dialogue-plan.js";
 import {loadDiaryEvidence} from "../src/v2/source-retrieval.js";
 import {composeSankoContext,readCurrentSnapshot} from "../src/v2/context.js";
 import {dayInMoscow} from "../src/lib.js";
