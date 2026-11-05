@@ -496,6 +496,7 @@ async function chat(req,env,origin,ctx) {
   return respond({error:"invalid_message"},400,origin,env);
  }
  const today=dayInMoscow(),scope=dateIntent(question,today),history=safeHistory(body?.history);
+ const policy=selectSankoContext(question,history,scope);
  const id=cleanConversationId(body?.conversationId);
  let runtime;
  const contextStarted=Date.now();
