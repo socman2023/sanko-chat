@@ -1,6 +1,8 @@
 // Minimal production fidelity gate. Real Gemini calls may consume quota.
 // Never prints chat transcript, IP, API tokens or private source texts.
 import {lintSankoReply} from "./sanko/check_reply.mjs";
+import {incorrectSourceAttributions} from "../worker/src/v2/attribution-audit.js";
+import {resolveApprovedFacts} from "../worker/src/v2/approved-ledger.js";
 const base="https://sanko-chat-api.boysinger2008.workers.dev";
 const version="sanko-worker-2.0.0-canon-first";
 const sleep=n=>new Promise(r=>setTimeout(r,n));
@@ -44,7 +46,7 @@ const history=[{role:"user",text:"Лодочник говорил о Лунцз�
 const corrected=await chat("Разве лодочник сообщил о Шицяо?",history);
 if(!corrected.reply.includes("Лунцзин")||!corrected.reply.includes("Шицяо"))
  throw Error("Speaker-to-place relation not preserved");
-if(/лодочн\p{L}*[^.!?]{0,50}шицяо/iu.test(corrected.reply))
+if(incorrectSourceAttributions(corrected.reply,resolveApprovedFacts(null,"2026-11-06")).length)
  throw Error("Wrong route attributed to boatman in live reply");
 if(lintSankoReply(corrected.reply).length)
  throw Error("Canonical spoken dialect or date violated in source correction");
