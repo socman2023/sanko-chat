@@ -1,0 +1,33 @@
+name: Sanko v2 — canonical fidelity and baseline comparison
+on:
+  pull_request:
+    paths:
+      - "worker/src/v2/**"
+      - "worker/tests/v2-*.test.mjs"
+      - "quality/v2-compare.mjs"
+      - ".github/workflows/v2-canon-acceptance.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  accept:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout candidate rebuild
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+          persist-credentials: false
+      - name: Checkout approved previous production
+        uses: actions/checkout@v4
+        with:
+          path: baseline
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify canonical source correctness and compare whole dialogue
+        run: |
+          node candidate/quality/v2-compare.mjs baseline/worker/src/index.js candidate/worker/src/v2/index.js
