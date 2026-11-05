@@ -7,6 +7,16 @@ workers_dev = true
 # Preserve VK_OWNER_USER_ID and other dashboard variables between GitHub deployments.
 keep_vars = true
 
+# Persist all diagnostic console events and invocation logs in Workers Logs.
+# Free plan: 200,000 events/day; retention 3 days; no API keys or chat text.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
+
 [vars]
 ALLOWED_ORIGIN = "https://socman2023.github.io"
 # Public ID of Sanko's own VK Mini App. NOT Sanko's personal VK profile ID.

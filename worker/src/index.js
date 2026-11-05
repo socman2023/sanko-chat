@@ -18,8 +18,10 @@ import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
+import { newChatTrace,markChatStage,getPromptBreakdown,
+ logGeminiAttempt,logChatFinished } from "./request-telemetry.js";
 
-const VERSION="sanko-worker-0.6.14";
+const VERSION="sanko-worker-0.6.15";
 // Public VK profile of Oleshka, distinct from Sanko’s Mini App and VK owner IDs.
 // Identity is used ONLY after verifying the signed VK launch on the server.
 const OLESHKA_VK_USER_ID=850667816;
@@ -397,7 +399,7 @@ async function geminiAttempt(env,model,timeout,system,contents,outputLimit=4096,
   return {ok:false,retryable:true,kind:"provider_busy"};
  }
 }
-async function answerWithGemini(env,system,history,question) {
+async function answerWithGemini(env,system,history,question,trace=null) {
  const contents=buildSankoConversation(history,question);
  let fallback=false,lastKind="provider_busy",anyQuota=false;
  const attempts=[];
@@ -407,7 +409,9 @@ async function answerWithGemini(env,system,history,question) {
    if(cooldown.kind==="provider_quota")anyQuota=true;
    fallback=true;continue;
   }
+  const modelStarted=Date.now();
   const result=await geminiAttempt(env,model,timeout,system,contents);
+  const latencyMs=Date.now()-modelStarted;
   // Preserve the HTTP code for failures in the existing token_usage.result
   // string (<=40 characters); no new D1 table or migration is needed.
   const kind=result.ok?"answered":result.kind||"provider_busy";
@@ -415,6 +419,8 @@ async function answerWithGemini(env,system,history,question) {
    ?kind+":"+String(result.httpStatus):kind;
   attempts.push({model,status,attemptedAt:Math.floor(Date.now()/1000),
    usage:result.usage||null});
+  logGeminiAttempt(trace,{model,result:status,httpStatus:result.httpStatus||(result.ok?200:0),
+   latencyMs,usage:result.usage});
   if(result.ok)return {ok:true,reply:result.reply,model,fallbackUsed:fallback,attempts};
   lastKind=result.kind||"provider_busy";
   if(lastKind==="provider_quota")anyQuota=true;
@@ -457,30 +463,49 @@ async function session(req,env,origin) {
   verified:!!verified,firstName:name},200,origin,env);
 }
 async function chat(req,env,origin,ctx) {
- if(!ready(env))return respond(publicChatError("service_unavailable"),503,origin,env);
+ const trace=newChatTrace(req,VERSION);
+ if(!ready(env)){
+  logChatFinished(trace,{outcome:"not_configured",status:503});
+  return respond(publicChatError("service_unavailable"),503,origin,env);
+ }
  const body=await bodyJson(req),question=shorten(body?.message,CHAT_MAX_CHARS+1);
  const verified=await verifyVk(body?.vkLaunch,env);
  const isOleshka=verified?.uid===OLESHKA_VK_USER_ID;
- if(!question||question.length>CHAT_MAX_CHARS)return respond({error:"invalid_message"},400,origin,env);
+ if(!question||question.length>CHAT_MAX_CHARS){
+  logChatFinished(trace,{outcome:"invalid_message",status:400});
+  return respond({error:"invalid_message"},400,origin,env);
+ }
  const today=dayInMoscow(),scope=dateIntent(question,today),history=safeHistory(body?.history);
  const id=cleanConversationId(body?.conversationId);
  let runtime;
+ const contextStarted=Date.now();
  try{runtime=await canonicalContext(env,scope);}catch{
+  markChatStage(trace,"canon",Date.now()-contextStarted);
+  logChatFinished(trace,{outcome:"canon_unavailable",status:503});
   return respond(publicChatError("service_unavailable"),503,origin,env);
  }
+ markChatStage(trace,"canon",Date.now()-contextStarted);
+ const admissionStarted=Date.now();
  const admission=await reserveAdmission(env,req,Date.now());
+ markChatStage(trace,"admission",Date.now()-admissionStarted);
+ trace.requestId=String(admission.id||"").slice(0,60);
  if(!admission.ok) {
   const reply=admission.kind==="ip"?"Нынче мы с тобой уже наговорились. Загляни завтра, ладно?":
     admission.kind==="month"?"Пока не могу продолжать разговор. Вернись в следующем месяце.":
     "На сегодня разговоров у меня уже через край. Завтра продолжим.";
+  logChatFinished(trace,{outcome:"quota_exhausted",status:429});
   return respond({error:"quota_exhausted",reply,retryAt:admission.retryAt,conversationId:id},429,origin,env);
  }
  let vectorHits=[];
+ const vectorStarted=Date.now();
  try{vectorHits=await retrieve(env,question,scope);}catch(err){console.warn("Sanko vector RAG unavailable",err?.name);}
+ markChatStage(trace,"retrieve",Date.now()-vectorStarted);
  // Hybrid search: private complete archive in Sanko D1 + semantic Vectorize.
  // Canon records are never stored in, or read from, Oleshka's private KV/D1.
  let lexicalHits=[];
+ const lexicalStarted=Date.now();
  try{lexicalHits=await canonLexical(env,question,6);}catch(err){console.warn("Sanko lexical RAG unavailable",err?.name);}
+ markChatStage(trace,"lexical",Date.now()-lexicalStarted);
  const seen=new Set();
  const hits=[];
  for(const hit of [...lexicalHits.slice(0,5),...vectorHits]) {
@@ -489,14 +514,23 @@ async function chat(req,env,origin,ctx) {
   seen.add(key);hits.push(hit);
   if(hits.length>=12)break;
  }
+ const diaryStarted=Date.now();
  const diary=await loadPublishedDiary(env,scope,question);
+ markChatStage(trace,"diary",Date.now()-diaryStarted);
  const openingCue=openingConversationCue(body?.openingGreeting,history);
  const system=systemText(runtime,scope,hits,today,diary,isOleshka)+openingCue+
   sankoClarificationCue(question,history);
- const generated=await answerWithGemini(env,system,history,question);
+ const prompt=getPromptBreakdown(runtime,hits,diary,system,history,question);
+ const generationStarted=Date.now();
+ const generated=await answerWithGemini(env,system,history,question,trace);
+ markChatStage(trace,"generation",Date.now()-generationStarted);
  await recordUsage(env,admission.id,generated.attempts);
  if(!generated.ok) {
+  const storeStarted=Date.now();
   await storeTurn(env,id,admission.id,question,"","","error");
+  markChatStage(trace,"store",Date.now()-storeStarted);
+  logChatFinished(trace,{outcome:generated.reason,status:generated.reason==="response_blocked"?422:503,
+   attempts:generated.attempts.length,prompt,mode:scope?"date-scoped":"general"});
   return respond(publicChatError(generated.reason,{conversationId:id}),generated.reason==="response_blocked"?422:503,origin,env);
  }
  const guarded=guardSankoReply(generated.reply);
@@ -507,7 +541,11 @@ async function chat(req,env,origin,ctx) {
  const spoken=enforceMandatorySankoForms(smoothSankoSpeech(clarified));
  if(literaryEquivalentsInSankoSpeech(spoken).length)
   console.error("Sanko mandatory forms invariant failed");
+ const storeStarted=Date.now();
  await storeTurn(env,id,admission.id,question,spoken,generated.model,"answered");
+ markChatStage(trace,"store",Date.now()-storeStarted);
+ logChatFinished(trace,{outcome:"answered",status:200,attempts:generated.attempts.length,
+  prompt,mode:scope?"date-scoped":"general"});
  if(Math.random()<0.01)ctx.waitUntil(expireOld(env));
  return respond({
   conversationId:id,reply:spoken,model:generated.model,
