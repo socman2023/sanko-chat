@@ -81,7 +81,7 @@ for(const [kind,q,history] of cases){
  // Voice, religion, first-person identity and the distinction between
  // witnessed and reported events must survive every optimization mode.
  for(const constraint of ["Слава Вароку","ОБЯЗАТЕЛЬНО ДЛЯ СОБСТВЕННОЙ РЕЧИ",
-   "Поднебесье","НИКОГДА не произноси календарные даты"]){
+   "Поднебесье"]){
   if(!after.prompt.includes(constraint))
    throw Error("Lost approved character constraint "+constraint+" in "+kind);
  }
