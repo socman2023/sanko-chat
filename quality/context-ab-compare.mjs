@@ -169,6 +169,48 @@ console.log("BARGE_FOUR_TURNS "+JSON.stringify({totals:bargeTotals,turns:bargeRe
 if(bargeTotals.now>bargeTotals.old*.75)
  throw Error("Newly measured barge conversation improvement below 25%");
 
+// Seven exact reader prompts and approximate corresponding visible dialogue
+// from the 2026-11-05 0.6.17 session. Their model replies are not canon.
+const seven=[
+ ["Что нового у тебя?","Плывем по реке на джонке, догоняем ту баржу."],
+ ["Какую баржу?","Тюремную. На ней Элинку с Руманом и батей их везут."],
+ ["Уже видали эту баржу?","Нема, покуда не нашли."],
+ ["А откуда знаете, что в Лунцзин их везут?","Местный лодочник сказывал."],
+ ["Так вроде на заставе вам еще кое-что сказали?","На заставе Тицзюй сказывал."],
+ ["Так может, их там высадят?","Ежли высадят, так разлучить могут."],
+ ["Чаешь, успеете?","Треба успеть."]
+];
+const sevenHistory=[],sevenResults=[],expected=["current",
+ "knowledge","knowledge","knowledge","knowledge","scene-followup","scene-followup"];
+for(const [question,modelReply] of seven){
+ const n=sevenResults.length,old=await run(baseline,question,sevenHistory);
+ const next=await run(candidate,question,sevenHistory);
+ const selected=posts.filter(p=>next.prompt.includes("TEST_ONLY_CANON_SOURCE_"+(p.post_id-6000)));
+ for(const p of selected)if(!next.prompt.includes("END_OF_COMPLETE_SOURCE_"+(p.post_id-6000)))
+  throw Error("Truncated full diary in real seven-turn test "+(n+1));
+ if(!next.prompt.includes(current)||!next.prompt.includes("Слава Вароку"))
+  throw Error("Missing approved current context or Sanko voice, seven-turn "+(n+1));
+ if(["current","scene-followup"].includes(expected[n])){
+  if(next.prompt.includes(profile))throw Error("Full profile remained in light path "+(n+1));
+  if(selected.length!==4)throw Error("Lost full latest four sources, seven-turn "+(n+1));
+ }else if(!next.prompt.includes(profile))
+  throw Error("Lost full canonical profile for concrete factual question "+(n+1));
+ if(n===5||n===6){
+  if(!next.prompt.includes("НЕ подтверждают факты"))
+   throw Error("Scene provenance protection missing "+(n+1));
+  if(next.stats.vectorQueries!==1)throw Error("Expected one narrowly limited RAG "+(n+1));
+ }
+ sevenResults.push({turn:n+1,question,baselineChars:old.prompt.length,
+  newChars:next.prompt.length,posts:selected.length});
+ sevenHistory.push({role:"user",text:question},{role:"model",text:modelReply});
+}
+const sevenTotals=sevenResults.reduce((a,r)=>({
+ old:a.old+r.baselineChars,new:a.new+r.newChars}),{old:0,new:0});
+console.log("SEVEN_REAL_TURNS "+JSON.stringify({totals:sevenTotals,turns:sevenResults}));
+if(sevenTotals.new>=sevenTotals.old*.88)
+ throw Error("Insufficient reduction on seven observed conversational turns");
+
+
 
 const lines=["# Offline A/B — identical synthetic sources and questions","",
  "These are SYSTEM PROMPT CHARACTERS, not real Gemini token usage.",
@@ -199,7 +241,18 @@ const lines=["# Offline A/B — identical synthetic sources and questions","",
  "Total 0.6.16 chars: "+bargeTotals.old,
  "Total 0.6.17 chars: "+bargeTotals.now,
  "Reduction: "+(100*(1-bargeTotals.now/bargeTotals.old)).toFixed(1)+"%",
- "The previous generated replies are used to resolve the topic, never as canon."];
+ "The previous generated replies are used to resolve the topic, never as canon.",
+ "",
+ "## Seven observed user turns from 0.6.17",
+ "",
+ "| Turn | User question | 0.6.17 chars | 0.6.18 chars | Full posts |",
+ "|---:|---|---:|---:|---:|",
+ ...sevenResults.map(r=>"| "+r.turn+" | "+r.question+" | "+r.baselineChars+" | "+r.newChars+" | "+r.posts+" |"),
+ "",
+ "Total baseline chars: "+sevenTotals.old,
+ "Total optimized chars: "+sevenTotals.new,
+ "Savings: "+(100*(1-sevenTotals.new/sevenTotals.old)).toFixed(1)+"%",
+ "Synthetic sources. These measurements are not Gemini input tokens."];
 writeFileSync("context-ab-results.md",lines.join("\n")+"\n");
 // Comparing two optimized Workers: unaffected modes must not regress.
 for(const mode of ["greeting","social","person","dated","detailed"]){
