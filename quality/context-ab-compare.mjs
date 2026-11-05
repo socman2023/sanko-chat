@@ -96,8 +96,8 @@ for(const [kind,q,history] of cases){
   throw Error("Unnecessary knowledge lookup for greeting");
  if(kind==="current"&&selected.length<4)throw Error("Lost recent entries");
  if(kind==="dated"&&selected.length<6)throw Error("Explicit day lost entries");
- if(kind==="person"&&!after.prompt.toLowerCase().includes("руман"))
-  throw Error("No topical Ruman evidence");
+ if(kind==="person"&&!selected.some(p=>p.post_id===6008||p.post_id===6010))
+  throw Error("Missed older Ruman diary post through Russian name inflections");
  results.push({kind,oldChars:before.prompt.length,newChars:after.prompt.length,
   savedPct:Math.round(1000*(1-after.prompt.length/before.prompt.length))/10,
   oldPosts:before.posts,newPosts:after.posts,
