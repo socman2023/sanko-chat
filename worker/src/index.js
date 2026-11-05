@@ -189,7 +189,7 @@ async function loadPublishedDiary(env,scope,question="",policy=null) {
       "ORDER BY published_at DESC,post_id DESC LIMIT 4",[850667816,day]));
    }
   } else if(policy?.diary==="recent"){
-   const limit=Math.max(1,Math.min(3,Number(policy.recentPosts)||1));
+   const limit=Math.max(1,Math.min(4,Number(policy.recentPosts)||1));
    rows.push(...await read(base+"ORDER BY published_at DESC,post_id DESC LIMIT "+limit,
     [850667816]));
   } else if(policy?.diary==="topical"){
