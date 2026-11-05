@@ -60,3 +60,37 @@ binding = "CURRENT_CONTEXT"
 id = "64705cefb4f54ff7bed3da7c5f0cb472"
 
 # Secrets stay in Cloudflare, never in this repository.
+
+# EXPERIMENTAL BRANCH ONLY: Cloudflare Worker Preview settings.
+# This block is not active for the production Worker (top-level configuration).
+# Previews require separately entered secrets in Cloudflare:
+#   GEMINI_API_KEY, IP_HASH_SECRET, ADMIN_UPDATE_TOKEN.
+# Use the same bindings only for short owner-controlled QA: GUARD_DB writes
+# count toward the current Sanko limits and appear in production admin logs.
+# Shared canonical KV/Vectorize and diary D1 remain the approved sources.
+[previews.vars]
+ALLOWED_ORIGIN = "https://socman2023.github.io"
+VK_APP_ID = "54875852"
+VK_OWNER_USER_ID = "1029851985"
+GEMINI_MODEL_ORDER = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash"
+
+[previews.ai]
+binding = "AI"
+
+[[previews.d1_databases]]
+binding = "GUARD_DB"
+database_name = "heroes-chat-sanko"
+database_id = "d566ac31-19ce-463f-80e5-6ed1b0d56b16"
+
+[[previews.d1_databases]]
+binding = "DIARY_DB"
+database_name = "heroes-chat-guard"
+database_id = "3d356f87-0894-4c03-8dac-a3b82ae2ed6c"
+
+[[previews.vectorize]]
+binding = "KNOWLEDGE"
+index_name = "heroes-knowledge"
+
+[[previews.kv_namespaces]]
+binding = "CURRENT_CONTEXT"
+id = "64705cefb4f54ff7bed3da7c5f0cb472"
