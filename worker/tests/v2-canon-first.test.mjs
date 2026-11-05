@@ -154,3 +154,20 @@ test("current snapshot respects structured KV and does not invent time",()=>{
  assert.deepEqual(readCurrentSnapshot(JSON.stringify({asOf:"2026-11-05",text:"Плывём."})),
  {asOf:"2026-11-05",text:"Плывём."});
 });
+
+test("a visitor's confident FALSE question cannot be endorsed with 'yes'",()=>{
+ const reply=auditReplyAgainstFacts("Да, правильно.",facts,
+  "Лодочник сказал про Шицяо, ведь так?");
+ assert.equal(reply.action,"rejected_unverified_visitor_attribution");
+ assert.match(reply.reply,/Лунцзин/);
+ const another=auditReplyAgainstFacts("Ну да.",facts,
+  "Тицзюй говорил о Лунцзине?");
+ assert.match(another.reply,/Лодочник говорил про Лунцзин/);
+});
+test("contradictory approved records force abstention, never invented compromise",()=>{
+ const conflict={facts:facts.facts,conflicts:[{a:"author1",b:"author2"}]};
+ const answer=auditReplyAgainstFacts("Лодочник сказал про Шицяо.",
+  conflict,"Разве лодочник то говорил?");
+ assert.equal(answer.action,"conflicting_canon_abstain");
+ assert(!answer.reply.includes("Шицяо"));
+});
