@@ -73,7 +73,7 @@ async function runChat(req,env,origin,ctx){
  const system=composeSankoContext({plan,
   profile:privateData.profile,current:privateData.current,
   diary,canon,approved,question,history,isOleshka,dayToday:today})+
-  "\n\n"+openingConversationCue(null,history)+
+  "\n\n"+openingConversationCue(body.openingGreeting,history)+
   "\n\n"+sankoClarificationCue(question,history);
  const prompt=safePromptMetrics({system,plan,
   profile:privateData.profile,current:privateData.current,
