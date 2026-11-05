@@ -13,12 +13,7 @@ const BASE=Object.freeze([
  {id:"2026-11-05/checkpoint/disembark",asOf:"2026-11-05",
   topic:"barge_route",subject:"тицзюй",predicate:"сообщил_высадку",
   object:"часть невольников высадят в Шицяо и направят другими путями",
-  source:"author-confirmed:2026-11-05",standpoint:"heard_by_group",certainty:"plan"},
- {id:"2026-11-05/barge/description",asOf:"2026-11-05",
-  topic:"barge_description",subject:"тюремная баржа",
-  predicate:"подтверждённые_приметы",
-  object:"четыре мачты; высокие нос и корма; белый круг на борту",
-  source:"author-final:2026-11-05",standpoint:"description",certainty:"known"}
+  source:"author-confirmed:2026-11-05",standpoint:"heard_by_group",certainty:"plan"}
 ]);
 const valid=x=>x&&typeof x==="object"&&typeof x.id==="string"&&x.id.length<=100&&
  isRealDay(x.asOf)&&["barge_route","barge_description","personal","current"].includes(x.topic)&&
