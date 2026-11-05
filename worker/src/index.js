@@ -153,8 +153,14 @@ function diaryTerms(question) {
  "расскажи","помнишь","сегодня","вчера","позавчера","дневнике","дневник",
  "случилось","произошло","пожалуйста","тогда","после","этого",
  "вместе","олешка","олешке","олешкой","санко","самого","вашего"]);
- return [...new Set((String(question||"").toLowerCase().match(/[\p{L}]{5,}/gu)||[])
-   .filter(w=>!stop.has(w)))].slice(0,2);
+ const words=(String(question||"").toLowerCase().match(/[\p{L}]{5,}/gu)||[])
+   .filter(w=>!stop.has(w));
+ const stem=w=>{
+  // Russian inflected names: Румана/Руману -> руман, Мстиславом -> мстислав.
+  const base=w.length>=6?w.replace(/(иями|ями|ами|ого|его|ому|ему|ыми|ими|остью|ов|ев|ом|ем|ой|ый|ий|их|ым|ах|ях|а|я|ы|и|у|е)$/u,""):w;
+  return base.length>=4?base:w;
+ };
+ return [...new Set(words.map(stem))].slice(0,2);
 }
 function diaryBody(value) {
  // Never truncate or modify published diary entries. The entire source_text
