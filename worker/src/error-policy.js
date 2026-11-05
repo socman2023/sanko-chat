@@ -4,6 +4,10 @@ export const SANKO_NOTICES=Object.freeze({
  provider_quota:"Не выходит нынче поговорить. Ты чуть погодя загляни, ладно?",
  provider_busy:"Не выходит поговорить. Ты загляни погодя, ладно?",
  model_unavailable:"Не выходит поговорить. Ты загляни погодя, ладно?",
+ provider_region:"Связь не ладится. Ты загляни погодя, ладно?",
+ provider_precondition:"Связь не ладится. Ты загляни погодя, ладно?",
+ provider_invalid_request:"Связь не ладится. Ты загляни погодя, ладно?",
+ provider_auth:"Связь не ладится. Ты загляни погодя, ладно?",
  service_unavailable:"Связь не ладится. Ты загляни погодя, ладно?",
  response_blocked:"Не стану говорить. Давай лучше о другом?",
 });
@@ -17,6 +21,24 @@ export function classifyProviderError(status,data){
    kind:code==="RESOURCE_EXHAUSTED"||quotaSignal?"provider_quota":"provider_busy",
    retryable:true
  };
+ // HTTP 400 can mean *different* problems. Preserve the safe category
+ // in token_usage.result so administrators can distinguish a malformed
+ // request from Google's explicit geographic eligibility restriction.
+ // Never save upstream free-form messages, request bodies, or credentials.
+ if(status===400){
+  const message=String(data?.error?.message||"").slice(0,1200);
+  const reasons=details.map(d=>String(d?.reason||"")).join(" ");
+  if(/(?:user location is not supported|location (?:is )?not supported|region (?:is )?not supported|country (?:is )?not supported|region.*unavailable|location.*unavailable)/iu.test(message)||
+     /(?:LOCATION_NOT_SUPPORTED|UNSUPPORTED_LOCATION|REGION_NOT_SUPPORTED)/iu.test(reasons))
+   return {kind:"provider_region",retryable:false,httpStatus:400};
+  if(code==="FAILED_PRECONDITION")
+   return {kind:"provider_precondition",retryable:false,httpStatus:400};
+  if(code==="INVALID_ARGUMENT")
+   return {kind:"provider_invalid_request",retryable:false,httpStatus:400};
+  return {kind:"service_unavailable",retryable:false,httpStatus:400};
+ }
+ if(status===401||status===403)
+  return {kind:"provider_auth",retryable:false,httpStatus:status};
  // A missing/unsupported model can be recovered by the next configured
  // model. Google's Gemini API explicitly recommends model fallback on 404.
  // Never blindly retry 400/401/403: malformed requests, invalid keys,
