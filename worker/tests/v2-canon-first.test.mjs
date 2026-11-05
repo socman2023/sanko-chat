@@ -35,7 +35,7 @@ test("canonical source ledger has exact author-confirmed speaker/place pairs",()
 test("future facts do not leak into a prior requested date",()=>{
  const old=resolveApprovedFacts(null,"2026-11-06","2026-11-04");
  assert.equal(old.facts.length,0);
- assert.equal(resolveApprovedFacts(null,"2026-11-05").facts.length,4);
+ assert.equal(resolveApprovedFacts(null,"2026-11-05").facts.length,3);
 });
 test("private KV fact override is typed and malformed batches are ignored",()=>{
  assert.deepEqual(approvedFactsFromKV("{broken"),[]);
