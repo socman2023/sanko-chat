@@ -20,7 +20,7 @@ test("current questions always retain the latest full published events",()=>{
  const c=mode("Что нового?");
  assert.equal(c.kind,"current");
  assert.equal(c.diary,"recent");
- assert.equal(c.recentPosts,2);
+ assert.equal(c.recentPosts,4);
  assert.equal(c.profile,"compact");
  const a=mode("Как дела?");
  assert.equal(a.kind,"social");
