@@ -607,11 +607,21 @@ async function chat(req,env,origin,ctx) {
 export default {
  async fetch(req,env,ctx) {
   const path=new URL(req.url).pathname;
+  const testingPreview=previewHost(req);
+  if(testingPreview&&req.method==="GET"&&path==="/__preview__/chat")
+   return previewResponse(PREVIEW_HTML,"text/html; charset=utf-8");
+  if(testingPreview&&req.method==="GET"&&path==="/__preview__/app.js")
+   return previewResponse(PREVIEW_JS,"text/javascript; charset=utf-8");
   // Administrative pages have their own same-origin check and Bearer auth.
   // The regular chat CORS policy must not block same-origin admin requests.
   if(path==="/admin"||path.startsWith("/admin/"))return adminFetch(req,env);
   const origin=req.headers.get("Origin")||"";
-  if(!isAllowedOrigin(origin,env.ALLOWED_ORIGIN))return new Response("Forbidden origin",{status:403});
+  const previewOwnOrigin=testingPreview&&origin===new URL(req.url).origin;
+  if(!previewOwnOrigin&&!isAllowedOrigin(origin,env.ALLOWED_ORIGIN))
+   return new Response("Forbidden origin",{status:403});
+  if(testingPreview&&req.method==="POST"&&path==="/api/chat"&&
+     !await previewAuthorized(req,env))
+   return respond({error:"preview_authorization_required"},401,origin,env);
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:headers(origin,env)});
   if(req.method==="GET"&&(path==="/"||path==="/health"))
    return respond({status:"ok",character:CHARACTER,version:VERSION,configured:ready(env),
