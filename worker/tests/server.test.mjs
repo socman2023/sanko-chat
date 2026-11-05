@@ -1129,3 +1129,53 @@ test("Gemini 400 failed precondition unrelated to region remains separately iden
   assert.equal(observed.usageInserts[0].values[4],"provider_precondition:400");
  }finally{globalThis.fetch=previous;}
 });
+
+test("live four-turn barge followup keeps voice, verifiable canon and only four RAG hits",async()=>{
+ const {env}=envStub({diary:true});
+ const requested=[],queryOptions=[];
+ env.AI.run=async(_model,body)=>{
+  requested.push(body.text[0]);
+  return {data:[Array(1024).fill(.001)]};
+ };
+ env.KNOWLEDGE.query=async(_vector,opts)=>{
+  queryOptions.push(opts);
+  return {matches:Array.from({length:10},(_,i)=>({
+   score:.99-i*.01,
+   metadata:{character:"sanko",date:"2026-11-05",source:"TEST",
+    text:"УТВЕРЖДЕННЫЙ_ТЕСТОВЫЙ_ФРАГМЕНТ_"+i}
+  }))};
+ };
+ const history=[
+  {role:"user",text:"Лучше скажи, что у тебя нового?"},
+  {role:"model",text:"Плывем по реке, за баржей следим."},
+  {role:"user",text:"Баржу еще не видели?"},
+  {role:"model",text:"Выдуманное сообщение о плавании — не источник."}
+ ];
+ const request=new Request(URL,{method:"POST",headers:{
+  Origin:"https://socman2023.github.io","Content-Type":"application/json"
+ },body:JSON.stringify({message:"А там что будет?",history,
+  conversationId:crypto.randomUUID()})});
+ const original=globalThis.fetch;
+ let prompt="";
+ globalThis.fetch=async(_url,init)=>{
+  prompt=JSON.parse(init.body).systemInstruction.parts[0].text;
+  return new Response(JSON.stringify({candidates:[{finishReason:"STOP",
+   content:{parts:[{text:"Не знаю пока, поглядим."}]}}]}),{status:200});
+ };
+ try{
+  const response=await worker.fetch(request,env,ctx);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(requested[0],"Баржу еще не видели?");
+  assert.equal(queryOptions[0].topK,8);
+  assert(data.knowledge.matches<=4);
+  assert(!prompt.includes("Approved personal profile of Sanko."),
+   "Long profile is not needed for a short anchored scene followup");
+  assert.match(prompt,/Санко — славон/);
+  assert.match(prompt,/ОБЯЗАТЕЛЬНО ДЛЯ СОБСТВЕННОЙ РЕЧИ/);
+  assert.match(prompt,/НЕ подтверждают факты/);
+  assert.match(prompt,/Олешка написал в дневнике: перелетели Стену/);
+  assert(!requested.join(" ").includes("Выдуманное сообщение"),
+   "The model's previous answer cannot enter canonical RAG query");
+ }finally{globalThis.fetch=original;}
+});

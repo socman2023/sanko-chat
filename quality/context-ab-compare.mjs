@@ -127,6 +127,49 @@ const dialogueTotals=dialogueStats.reduce((a,r)=>({
  old:a.old+r.oldChars,now:a.now+r.newChars}),{old:0,now:0});
 console.log("MULTITURN_TOTALS "+JSON.stringify(dialogueTotals));
 
+// The four REAL user questions from the 2026-11-05 barge conversation.
+// Replies below are only conversation-memory references, not trusted facts.
+// Full diary source material remains the synthetic approved-source fixture.
+const bargeTurns=[
+ ["Лучше скажи, что у тебя нового?","Плывём по реке на джонке, за баржей следим."],
+ ["Баржу еще не видели?","Одну приметили, да не ту, чужая."],
+ ["А там что будет?","Надо посмотреть, что в следующем месте."],
+ ["Чаешь, успеете?","Чаем. Поглядим, как пойдёт."]
+];
+const bargeHistory=[],bargeResults=[];
+for(const [question,answer] of bargeTurns){
+ const old=await run(baseline,question,bargeHistory);
+ const next=await run(candidate,question,bargeHistory);
+ const number=bargeResults.length+1;
+ const selected=posts.filter(p=>next.prompt.includes("TEST_ONLY_CANON_SOURCE_"+(p.post_id-6000)));
+ if(!next.prompt.includes(current))throw Error("Lost approved current context on barge turn "+number);
+ if(!next.prompt.includes("Слава Вароку"))throw Error("Lost Sanko voice on barge turn "+number);
+ for(const p of selected){
+  if(!next.prompt.includes("END_OF_COMPLETE_SOURCE_"+(p.post_id-6000)))
+   throw Error("Lost full diary ending on barge turn "+number);
+ }
+ if(number===1||number>=3){
+  if(next.prompt.includes(profile))
+   throw Error("Heavy personal archive unnecessarily sent on barge turn "+number);
+  if(selected.length!==4)
+   throw Error("Recent canon not fully loaded on barge turn "+number);
+ }
+ if(number>=3&&!next.prompt.includes("НЕ подтверждают факты"))
+  throw Error("Missing previous-model-answer provenance guard on barge followup "+number);
+ if(number===2&&!next.prompt.includes(profile))
+  throw Error("Specific barge topic must retain full canonical profile");
+ bargeResults.push({turn:number,question,oldChars:old.prompt.length,
+  newChars:next.prompt.length,selectedPosts:selected.length,
+  sourceSearches:next.stats.vectorQueries});
+ bargeHistory.push({role:"user",text:question},{role:"model",text:answer});
+}
+const bargeTotals=bargeResults.reduce((a,r)=>({
+ old:a.old+r.oldChars,now:a.now+r.newChars}),{old:0,now:0});
+console.log("BARGE_FOUR_TURNS "+JSON.stringify({totals:bargeTotals,turns:bargeResults}));
+if(bargeTotals.now>bargeTotals.old*.75)
+ throw Error("Newly measured barge conversation improvement below 25%");
+
+
 const lines=["# Offline A/B — identical synthetic sources and questions","",
  "These are SYSTEM PROMPT CHARACTERS, not real Gemini token usage.",
  "No Gemini calls were made. A mock cannot certify the characters' actual replies.","",
@@ -145,7 +188,22 @@ const lines=["# Offline A/B — identical synthetic sources and questions","",
  "",
  "Total baseline characters: "+dialogueTotals.old,
  "Total experimental characters: "+dialogueTotals.now,
- "Reduction: "+(100*(1-dialogueTotals.now/dialogueTotals.old)).toFixed(1)+"%"];
+ "Reduction: "+(100*(1-dialogueTotals.now/dialogueTotals.old)).toFixed(1)+"%",
+ "",
+ "## User-observed four-turn barge conversation",
+ "",
+ "| Turn | User question | v0.6.16 chars | v0.6.17 chars | Canon posts |",
+ "|---:|---|---:|---:|---:|",
+ ...bargeResults.map(r=>"| "+r.turn+" | "+r.question+" | "+r.oldChars+" | "+r.newChars+" | "+r.selectedPosts+" |"),
+ "",
+ "Total 0.6.16 chars: "+bargeTotals.old,
+ "Total 0.6.17 chars: "+bargeTotals.now,
+ "Reduction: "+(100*(1-bargeTotals.now/bargeTotals.old)).toFixed(1)+"%",
+ "The previous generated replies are used to resolve the topic, never as canon."];
 writeFileSync("context-ab-results.md",lines.join("\n")+"\n");
-if(results.find(x=>x.kind==="greeting").savedPct<45)throw Error("Greeting reduction below threshold");
-if(results.find(x=>x.kind==="current").savedPct<25)throw Error("Current reduction below threshold");
+// Comparing two optimized Workers: unaffected modes must not regress.
+for(const mode of ["greeting","social","person","dated","detailed"]){
+ const row=results.find(x=>x.kind===mode);
+ if(row.newChars>row.oldChars*1.03)
+  throw Error("Unexpected prompt regression in mode "+mode);
+}

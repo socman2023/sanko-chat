@@ -24,13 +24,13 @@ jobs:
           set -eu
           for i in $(seq 1 18); do
             body="$(curl -fsS --max-time 9 https://sanko-chat-api.boysinger2008.workers.dev/health || true)"
-            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.16" and .diarySync.status=="ok"' >/dev/null 2>&1; then
+            if printf '%s' "$body" | jq -e '.version=="sanko-worker-0.6.17" and .diarySync.status=="ok"' >/dev/null 2>&1; then
               printf '%s' "$body" | jq '{version,diarySync}'
               exit 0
             fi
             sleep 8
           done
-          echo "New Worker v0.6.16 / diary not verified" >&2
+          echo "New Worker v0.6.17 / diary not verified" >&2
           exit 1
       - name: Test first reply referencing the actual VK greeting
         shell: bash
@@ -52,7 +52,7 @@ jobs:
           const data=await response.json();
           const reply=data.reply||"";
           console.log(JSON.stringify({http:response.status,
-            worker:"sanko-worker-0.6.16",
+            worker:"sanko-worker-0.6.17",
             model:data.model,reply,diaryPosts:data.knowledge?.diaryPosts},null,2));
           if(!response.ok||!reply.trim())throw Error("First reply unavailable");
           const words=reply.trim().split(/\s+/u).length;
