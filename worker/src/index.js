@@ -18,6 +18,7 @@ import { smoothSankoSpeech } from "./sanko-natural-phrases.js";
 import { classifyProviderError, publicChatError } from "./error-policy.js";
 import { classifySankoVkVisitor } from "./vk-relationships.js";
 import { openingConversationCue } from "./sanko-opening-context.js";
+import { selectSankoContext,SANKO_COMPACT_IDENTITY } from "./context-selection.js";
 import { newChatTrace,markChatStage,getPromptBreakdown,
  logGeminiAttempt,logChatFinished } from "./request-telemetry.js";
 
@@ -160,7 +161,8 @@ function diaryBody(value) {
  // saved by the existing Oleshka importer must reach Gemini unchanged.
  return typeof value==="string"?value:"";
 }
-async function loadPublishedDiary(env,scope,question="") {
+async function loadPublishedDiary(env,scope,question="",policy=null) {
+ if(policy?.diary==="none")return {available:!!env.DIARY_DB?.prepare,posts:[]};
  if(!env.DIARY_DB?.prepare)return {available:false,posts:[]};
  const day=scope?.day||"";
  const base="SELECT post_id,published_day_msk,source_url,source_text "+
@@ -179,7 +181,25 @@ async function loadPublishedDiary(env,scope,question="") {
     rows.push(...await read(base+"AND published_day_msk<? "+
       "ORDER BY published_at DESC,post_id DESC LIMIT 4",[850667816,day]));
    }
+  } else if(policy?.diary==="recent"){
+   const limit=Math.max(1,Math.min(3,Number(policy.recentPosts)||1));
+   rows.push(...await read(base+"ORDER BY published_at DESC,post_id DESC LIMIT "+limit,
+    [850667816]));
+  } else if(policy?.diary==="topical"){
+   // Select full original texts: do not discard middle or ending paragraphs.
+   const recent=Math.max(1,Math.min(4,Number(policy.recentPosts)||2));
+   rows.push(...await read(base+"ORDER BY published_at DESC,post_id DESC LIMIT "+recent,
+    [850667816]));
+   const words=diaryTerms(question);
+   if(words.length){
+    const where=words.map(()=>"source_text LIKE ?").join(" OR ");
+    const n=Math.max(1,Math.min(10,Number(policy.topicPosts)||5));
+    rows.push(...await read(base+"AND ("+where+") "+
+      "ORDER BY published_at DESC,post_id DESC LIMIT "+n,
+      [850667816,...words.map(w=>"%"+w+"%")]));
+   }
   } else {
+   // Continuations keep all recent records for chronological coherence.
    // Current and previous day take PRIORITY over topic matches.
    // Follow-ups like "А потом?" now still see the whole recent day.
    const today=dayInMoscow(),yesterday=previousDiaryDay(today);
