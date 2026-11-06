@@ -29,6 +29,7 @@ jobs:
           }
           if(!health)throw Error('new_clean_worker_not_live');
           const history=[],conversationId=crypto.randomUUID();
+          let turn=0;
           let hasKeyEvent=false;
           let firstResponse='';
           for(const message of ['А у тебя что нового?', 'Расскажи, что сегодня было.', 'Какое важное событие произошло?']){
@@ -44,8 +45,12 @@ jobs:
               model:data.model||null,knowledge:data.knowledge||null}));
             if(!res.ok||!reply.trim())throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
             if(!history.length){firstResponse=reply;if(!(/ратш/iu.test(reply)&&/элин/iu.test(reply)))throw Error('generic_whats_new_missed_main_rescue_recognition');}
+            if(turn===1 && health.diarySync?.latestPostDay!==health.diarySync?.today &&
+                /(?:за весь день.{0,45}(?:нич|не видал)|ничего особенного|ничего не произошло|ничего не случилось)/iu.test(reply))
+              throw Error('today_answer_invented_empty_day');
             if(/ратш/iu.test(reply)&&/элин/iu.test(reply))hasKeyEvent=true;
             history.push({role:'user',text:message},{role:'model',text:reply});
+            turn++;
           }
           console.log('keyEventMentioned',hasKeyEvent,'firstResponse',firstResponse.slice(0,300));
           if(!hasKeyEvent)throw Error('live_chat_ignored_main_rescue_event');
