@@ -38,7 +38,7 @@ jobs:
             const data=await res.json().catch(()=>({error:'invalid_json_reply'}));
             console.log('chat',JSON.stringify({http:res.status,message,
               reply:typeof data.reply==='string'?data.reply.slice(0,500):null,
-              error:data.error||null,model:data.model||null,
+              error:data.error||null,providerCode:data.providerCode||null,model:data.model||null,
               knowledge:data.knowledge||null}));
             if(!res.ok||!data.reply||typeof data.reply!=='string')throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
             history.push({role:'user',text:message},{role:'model',text:data.reply});
