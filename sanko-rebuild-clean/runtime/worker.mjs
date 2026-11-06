@@ -118,7 +118,7 @@ async function loadContext(env,today){
     claims=parsed;
   }
   return buildCurrentContext({today,posts:snapshot.posts,approvedClaims:claims,
-    sourceReadComplete:true});
+    sourceReadComplete:true,maxSourcePosts:6});
 }
 
 /** Injectable dependencies are for offline testing only; production uses bindings. */
