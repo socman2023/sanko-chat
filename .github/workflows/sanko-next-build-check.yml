@@ -27,7 +27,7 @@ jobs:
           import {brotliDecompressSync} from 'node:zlib';
           const src=readFileSync('buildpack/sanko-clean-stage11.tar.br');
           const actual=createHash('sha256').update(src).digest('hex');
-          const expected='3e50de9c23a3c95df571a6dda8a712f7a5a97bdf4b531706ee015e6fe2880799';
+          const expected='f5f43e8283161226f254fed2f3088e3d5ef433be010bbb209e029905b593c126';
           if(actual!==expected)throw Error('Unexpected clean source digest: '+actual);
           writeFileSync('/tmp/sanko-clean-source.tar',brotliDecompressSync(src));
           console.log('SOURCE VERIFIED',actual,'bytes',src.length);
