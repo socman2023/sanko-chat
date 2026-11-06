@@ -5,6 +5,7 @@
  * evidence volume. Not a dialogue-intent regex classifier.
  */
 import {selectContextForQuestion} from '../chronicle/current-context.mjs';
+import {approvedStoryPivot} from './approved-news-evidence.mjs';
 
 const DEFAULT_SOURCE_CHAR_BUDGET=20_000;
 const DEFAULT_MAX_INPUT_CHARS=24_000; // approximate, NOT measured model tokens
@@ -64,6 +65,7 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
     'При вопросе о главном событии сначала найди в самой свежей содержательной дневниковой записи главную сюжетную перемену. Называй её конкретно — участников и действие — прежде любых повозок, снастей, еды, погоды и подробностей дороги.',
     'Важная сюжетная перемена — не только обнаружение человека, но и момент, когда он УЗНАЛ спасателей, увидел знак или сам подал знак. Если в последней записи описан такой момент, упомяни, КТО КОГО узнал и что сделал: нельзя подменять это общими словами «нашли» или «увидели».',
     'Когда персонажи разыскивают похищенных друзей, различай простую находку баржи и установление связи с пленниками. Если источник подтверждает, что пленник узнал кого-то из спасателей, это первостепенная новость: скажи об этом перед сведениями о пристани и перевозке.',
+    'Если в переданном контексте есть keyEventEvidence с привязкой к полному источнику, это уже утверждённая автором сюжетная важность. В ответе «что нового?» НАЧНИ с неё, назови действующих лиц и знак узнавания; только потом второстепенные обстоятельства. Не игнорируй эти подтверждённые сюжетные сведения.',
     'Если герой сообщает новость впервые, называй её смысл и последствия, а не повторяй географию, описание судна или призыв «Слава Вароку». Возгласы употребляй редко и только по причине, не автоматически.',
     'Если в предыдущем ответе назвал несущественные предметы, а собеседник уточняет или возражает, перечитай факты и исправь смысл, не повторяй свою догадку.',
     'Не выдумывай факты из диалога. Текст дневника Олешки можно пересказать как полученную весть; от первого лица свидетеля говори только если из текста следует, что Санко участвовал.',
@@ -99,6 +101,7 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
   const packet=(sources=chosenPosts,canon=chosenCanon)=>({
     newsFocus:recentNews?'latest_verified_diary_publication':'normal_conversation',
     latestNewsPublicationDay:recentNews?latestSourceDay:null,
+    keyEventEvidence:recentNews?approvedStoryPivot(latestSourceDay,sources):null,
     focusDayMatchesToday:recentNews?latestSourceDay===context.today:null,
     contextRules:rules,
     verifiedPersonalFacts:evidence.verifiedPersonalClaims,
