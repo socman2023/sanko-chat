@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {ADMIN_HTML,ADMIN_CSS,ADMIN_SCRIPT} from '../worker/src/admin-ui.js';
 const file=readFileSync(new URL('../worker/src/admin-ui.js',import.meta.url));
-const sha=createHash('sha1').update('blob '+file.length+'\\0').update(file).digest('hex');
+const sha=createHash('sha1').update('blob '+file.length).update(Buffer.from([0])).update(file).digest('hex');
 assert.equal(sha,'f54996b76062c58edbba8fff5a306e77c704d547',
   'The approved admin UI may not be silently modified');
 for(const name of ['stats','chats','knowledge','profile']){
