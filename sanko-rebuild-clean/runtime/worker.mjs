@@ -145,8 +145,8 @@ export function createSankoHandler({personaLoader=async env=>env?.STAGING_MODE==
       'Access-Control-Allow-Origin':origin||DEFAULT_ORIGIN,
       'Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST,GET,OPTIONS',
       'Access-Control-Max-Age':'600'}});
-    if(request.method==='GET'&&path==='/health')return response({status:'staging_only',
-      character:'sanko',engine:'clean-not-deployed',
+    if(request.method==='GET'&&path==='/health')return response({status:env?.STAGING_MODE==='true'?'staging_only':'ok',
+      character:'sanko',engine:env?.STAGING_MODE==='true'?'clean-not-deployed':'sanko-clean-3.0.0',
       requiresApprovedPersona:true,
       realGeminiEnabled:env?.ENABLE_REAL_MODEL==='true',
       quota:env?.STAGING_MODE==='true'?STAGING_QUOTAS:QUOTAS,
