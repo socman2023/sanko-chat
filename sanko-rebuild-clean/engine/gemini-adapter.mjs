@@ -10,7 +10,8 @@ export class GeminiAdapter {
   async generate({system,history=[],message,maxOutputTokens=768}) {
     const contents=[...history.map(h=>({role:h.role==='model'?'model':'user',
       parts:[{text:h.text}]})),{role:'user',parts:[{text:message}]}];
-    const response=await this.fetchImpl(
+    const transport=this.fetchImpl;
+    const response=await transport(
       `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`,{
         method:'POST',
         headers:{'Content-Type':'application/json','x-goog-api-key':this.apiKey},
