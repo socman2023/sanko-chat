@@ -1,0 +1,57 @@
+name: Sanko next - actual Wrangler dry-run build (isolated)
+on:
+  push:
+    branches:
+      - build/sanko-clean-wrangler-check-20261107
+    paths:
+      - buildpack/sanko-clean-stage11.tar.br
+      - .github/workflows/sanko-next-build-check.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify archived clean source and unpack without network
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {brotliDecompressSync} from 'node:zlib';
+          const src=readFileSync('buildpack/sanko-clean-stage11.tar.br');
+          const actual=createHash('sha256').update(src).digest('hex');
+          const expected='b5212c48b04271bd099625454985c97401f6307a0d0a1214e84d154eaff3ee26';
+          if(actual!==expected)throw Error('Unexpected clean source digest: '+actual);
+          writeFileSync('/tmp/sanko-clean-source.tar',brotliDecompressSync(src));
+          console.log('SOURCE VERIFIED',actual,'bytes',src.length);
+          NODE
+          tar -xf /tmp/sanko-clean-source.tar
+          test -f sanko-rebuild-clean/runtime/index.mjs
+          test -f worker/src/admin-ui.js
+      - name: Inspect source integrity and attach byte-identical approved admin UI
+        shell: bash
+        run: |
+          node sanko-rebuild-clean/runtime/tools/attach-admin-ui.mjs worker/src/admin-ui.js
+          for f in sanko-rebuild-clean/runtime/*.mjs sanko-rebuild-clean/engine/*.mjs sanko-rebuild-clean/chronicle/*.mjs; do node --check "$f"; done
+      - name: Install Wrangler in isolated source tree
+        shell: bash
+        run: npm install --prefix sanko-rebuild-clean --no-save --no-package-lock wrangler@4
+      - name: Actual Wrangler compilation, dry-run only, fake resource IDs
+        shell: bash
+        run: |
+          bash sanko-rebuild-clean/runtime/staging/dryrun-build.sh \
+            "$PWD/worker/src/admin-ui.js" "$PWD/sanko-rebuild-clean/.wrangler-dryrun-stage11"
+          test -n "$(find sanko-rebuild-clean/.wrangler-dryrun-stage11 -type f -print -quit)"
+      - name: Save compiled output for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanko-clean-wrangler-dryrun
+          path: sanko-rebuild-clean/.wrangler-dryrun-stage11/
+          if-no-files-found: error
