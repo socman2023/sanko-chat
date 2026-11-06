@@ -1,4 +1,4 @@
-name: Verify deployed CLEAN Sanko (live; two user messages)
+name: Verify clean Sanko latest diary news (live)
 on:
   push:
     branches:
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Wait for real clean Worker health and send two genuine Gemini requests
+      - name: Verify latest-day plot event and conversation correction against real Gemini
         shell: bash
         run: |
           node --input-type=module <<'NODE'
@@ -29,19 +29,25 @@ jobs:
           }
           if(!health)throw Error('new_clean_worker_not_live');
           const history=[],conversationId=crypto.randomUUID();
-          for(const message of ['Здрав будь, Санко! Как поживаешь?','А что у тебя нового?']){
+          let hasKeyEvent=false;
+          let firstResponse='';
+          for(const message of ['А что у вас нового? Расскажи главное событие из последней записи Олешки.', 'Ты серьёзно? Какое именно важное событие произошло?', 'А что было вчера — чем завершился день?']){
             const res=await fetch(root+'/api/chat',{
               method:'POST',signal:AbortSignal.timeout(65000),
               headers:{'Origin':'https://socman2023.github.io','Content-Type':'application/json'},
               body:JSON.stringify({message,conversationId,history})
             });
             const data=await res.json().catch(()=>({error:'invalid_json_reply'}));
+            const reply=typeof data.reply==='string'?data.reply:'';
             console.log('chat',JSON.stringify({http:res.status,message,
-              reply:typeof data.reply==='string'?data.reply.slice(0,500):null,
-              error:data.error||null,providerCode:data.providerCode||null,model:data.model||null,
-              knowledge:data.knowledge||null}));
-            if(!res.ok||!data.reply||typeof data.reply!=='string')throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
-            history.push({role:'user',text:message},{role:'model',text:data.reply});
+              reply:reply.slice(0,1000),error:data.error||null,
+              model:data.model||null,knowledge:data.knowledge||null}));
+            if(!res.ok||!reply.trim())throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
+            if(!history.length)firstResponse=reply;
+            if(/ратш/iu.test(reply)&&/элин/iu.test(reply))hasKeyEvent=true;
+            history.push({role:'user',text:message},{role:'model',text:reply});
           }
-          console.log('PASS: new production Sanko answered two real messages');
+          console.log('keyEventMentioned',hasKeyEvent,'firstResponse',firstResponse.slice(0,300));
+          if(!hasKeyEvent)throw Error('live_chat_ignored_main_rescue_event');
+          console.log('PASS: live recent-day news and correction flow completed');
           NODE
