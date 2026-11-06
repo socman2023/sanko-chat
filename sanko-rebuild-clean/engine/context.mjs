@@ -42,7 +42,7 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
     throw new TypeError('invalid_prompt_request');
   const recentThread=asksForRecentNews(message,stableHistory(history));
   const evidence=selectContextForQuestion(context,{
-    maxSourceCharacters:recentThread?Math.max(sourceCharBudget,28_000):sourceCharBudget});
+    maxSourceCharacters:recentThread&&sourceCharBudget===DEFAULT_SOURCE_CHAR_BUDGET?28_000:sourceCharBudget});
   const speakerRule=confirmedOleshka?
     'Собеседник удостоверенно Олешка, твой двоюродный брат и друг. Учитывай совместный опыт.':
     'Собеседник — читатель; не считай его Олешкой или физически присутствующим рядом.';
@@ -70,7 +70,7 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
   const messages=stableHistory(history);
   const recentNews=recentThread;
   const latestSourceDay=context.lastKnownPublicationDay||null;
-  const effectiveBudget=recentNews?Math.max(maxInputChars,36_000):maxInputChars;
+  const effectiveBudget=recentNews&&maxInputChars===DEFAULT_MAX_INPUT_CHARS?36_000:maxInputChars;
   const charsOther=message.length+messages.reduce((s,h)=>s+h.text.length,0);
   const sourceRows=evidence.sourcePosts.map(p=>({
     sourceUrl:p.sourceUrl,publicationDay:p.publishedDay,
