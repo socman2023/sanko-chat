@@ -16,7 +16,7 @@ export async function answerAsSanko({model,persona,context,knowledge=null,histor
   try {result=await model.generate({system:prompt.system,history:prompt.messages,
       message:prompt.message,maxOutputTokens:768});}
   catch(err){return {ok:false,error:'provider_unavailable',providerCalls:1,
-    diagnostic:String(err?.code||err?.name||'error'),usage:err?.usage||null};}
+    diagnostic:String(err?.code||err?.message||err?.name||'error').replace(/AIza[A-Za-z0-9_-]+/g,'[redacted]').slice(0,120),usage:err?.usage||null};}
   const reply=typeof result?.text==='string'?result.text.trim():'';
   const check=checkSankoResponse(reply);
   if(!check.ok)return {ok:false,error:'response_quality_failed',providerCalls:1,
