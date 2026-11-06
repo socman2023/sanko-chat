@@ -94,6 +94,14 @@ jobs:
           assert.equal((await chat.json()).error,'not_configured');
           console.log('PASS: local Cloudflare runtime, health, admin UI, private data auth, forged VK, model gate');
           NODE
+      - name: Compile exact production Worker entry before activating main
+        shell: bash
+        run: |
+          mkdir -p compiled-production-worker
+          sanko-rebuild-clean/node_modules/.bin/wrangler deploy \
+            --config wrangler.toml --dry-run --outdir compiled-production-worker
+          test -n "$(find compiled-production-worker -type f -print -quit)"
+          echo 'PASS: production Worker entry bundles without deploying'
       - name: Save compiled output for inspection
         uses: actions/upload-artifact@v4
         with:
