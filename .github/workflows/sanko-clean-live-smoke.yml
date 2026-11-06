@@ -1,0 +1,47 @@
+name: Verify deployed CLEAN Sanko (live; two user messages)
+on:
+  push:
+    branches:
+      - audit/sanko-clean-live-smoke-20261107
+    paths:
+      - .github/workflows/sanko-clean-live-smoke.yml
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Wait for real clean Worker health and send two genuine Gemini requests
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const root='https://sanko-chat-api.boysinger2008.workers.dev';
+          let health=null;
+          for(let attempt=0;attempt<36;attempt++){
+            try{
+              const res=await fetch(root+'/health',{signal:AbortSignal.timeout(8000)});
+              const data=await res.json();
+              console.log('health',JSON.stringify({status:res.status,engine:data.engine,diarySync:data.diarySync?.status,latestPostDay:data.diarySync?.latestPostDay}));
+              if(res.ok&&data.engine==='sanko-clean-3.0.0'){health=data;break;}
+            }catch(err){console.log('health attempt unavailable',err?.name||'error');}
+            await new Promise(r=>setTimeout(r,5000));
+          }
+          if(!health)throw Error('new_clean_worker_not_live');
+          const history=[],conversationId=crypto.randomUUID();
+          for(const message of ['Здрав будь, Санко! Как поживаешь?','А что у тебя нового?']){
+            const res=await fetch(root+'/api/chat',{
+              method:'POST',signal:AbortSignal.timeout(65000),
+              headers:{'Origin':'https://socman2023.github.io','Content-Type':'application/json'},
+              body:JSON.stringify({message,conversationId,history})
+            });
+            const data=await res.json().catch(()=>({error:'invalid_json_reply'}));
+            console.log('chat',JSON.stringify({http:res.status,message,
+              reply:typeof data.reply==='string'?data.reply.slice(0,500):null,
+              error:data.error||null,model:data.model||null,
+              knowledge:data.knowledge||null}));
+            if(!res.ok||!data.reply||typeof data.reply!=='string')throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
+            history.push({role:'user',text:message},{role:'model',text:data.reply});
+          }
+          console.log('PASS: new production Sanko answered two real messages');
+          NODE
