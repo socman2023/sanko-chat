@@ -82,3 +82,16 @@ test('editorial plot cue is withheld unless specific source mentions all three p
   assert(out.ok);
   assert(!out.system.includes('author_approved_source_backed_story_pivot'));
 });
+
+test('after-midnight today query must not claim that no event happened today',async()=>{
+  const p=await makePost(32259,'2026-11-06',narrative);
+  const ctx=buildCurrentContext({today:'2026-11-07',posts:[p],
+    maxSourcePosts:6,sourceReadComplete:true});
+  const out=composePrompt({persona,context:ctx,
+    message:'Расскажи, что сегодня было.'});
+  assert(out.ok);
+  assert.match(out.system,/Достоверных сведений о событиях именно сегодняшнего дня НЕТ/);
+  assert.match(out.system,/НЕ МОЖЕШЬ говорить/);
+  assert.match(out.system,/Не выдавай вчерашнюю историю за сегодняшнюю/);
+  assert.match(out.system,/Элина узнала Ратшу и подала знак/);
+});
