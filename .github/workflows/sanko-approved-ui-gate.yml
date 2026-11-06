@@ -1,0 +1,22 @@
+name: Sanko approved UI source gate (no deploy)
+on:
+  push:
+    branches:
+      - audit/sanko-clean-ui-gate-20261106
+    paths:
+      - stage8/verify-approved-admin-ui.mjs
+      - .github/workflows/sanko-approved-ui-gate.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify immutable approved admin presentation and API contracts
+        run: node stage8/verify-approved-admin-ui.mjs
