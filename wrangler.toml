@@ -1,7 +1,7 @@
 # GitHub-connected Cloudflare Worker for Sanko only.
-# Rebuilt canon-first entry point. Admin/session and private D1 bindings retained.
+# New clean Sanko conversation engine. Existing D1, KV, admin and identity bindings retained.
 name = "sanko-chat-api"
-main = "worker/src/v2/index.js"
+main = "sanko-rebuild-clean/runtime/production.mjs"
 compatibility_date = "2026-10-31"
 workers_dev = true
 # Preserve VK_OWNER_USER_ID and other dashboard variables between GitHub deployments.
@@ -27,6 +27,13 @@ VK_OWNER_USER_ID = "1029851985"
 # Primary is used first; fallbacks only for retryable overload, timeout,
 # transient API errors or empty/truncated answers. Billing tier unchanged.
 GEMINI_MODEL_ORDER = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.8-flash"
+# Single primary model used by the clean provider adapter.
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+STAGING_MODE = "false"
+ENABLE_REAL_MODEL = "true"
+ENABLE_ADMIN_MUTATIONS = "true"
+ENABLE_CHRONICLE_SYNC = "false"
+ENABLE_CHRONICLE_EXTRACTION = "false"
 
 # Dedicated D1 database for Sanko's conversations and rate limits.
 # Do not use the Oleshka database heroes-chat-guard here.
