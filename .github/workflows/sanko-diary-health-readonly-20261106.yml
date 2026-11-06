@@ -1,0 +1,44 @@
+name: Sanko diary freshness audit (read-only)
+on:
+  push:
+    branches:
+      - audit/sanko-diary-health-readonly-20261106
+    paths:
+      - .github/workflows/sanko-diary-health-readonly-20261106.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Inspect existing PUBLIC health status; no data changes
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const url = 'https://sanko-chat-api.boysinger2008.workers.dev/health';
+          const response=await fetch(url,{method:'GET',redirect:'error',
+            headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000)});
+          if(!response.ok)throw Error('HTTP '+response.status);
+          const body=await response.json();
+          const sync=body?.diarySync||{};
+          const now=new Date();
+          const dayMsk=new Date(now.valueOf()+3*3600000).toISOString().slice(0,10);
+          const report={
+            checkedAt:now.toISOString(),dayMsk,
+            workerVersion:body?.version||null,
+            connected:body?.diaryConnected===true,
+            configured:body?.configured===true,
+            diaryStatus:sync.status||'unknown',
+            latestPostDay:sync.latestPostDay||null,
+            latestPostId:sync.latestPostId??null,
+            latestPublishedAt:sync.latestPublishedAt||null,
+            latestIngestedAt:sync.latestIngestedAt||null,
+            postsToday:Number.isInteger(sync.postsToday)?sync.postsToday:null,
+            hasPublicationForToday:sync.latestPostDay===dayMsk&&sync.postsToday>0,
+            note:'DB data only. Not proof of VK sync since latest ingest or of actual event day.'
+          };
+          console.log(JSON.stringify(report,null,2));
+          if(!report.connected||report.diaryStatus!=='ok')process.exitCode=1;
+          NODE
