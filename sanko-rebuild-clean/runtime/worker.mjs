@@ -10,6 +10,7 @@ import {GeminiAdapter} from '../engine/gemini-adapter.mjs';
 import {admit,storeTurn,storeTokenAttempt,QUOTAS} from './guard-store.mjs';
 import {readCanonicalEvidence} from './knowledge-search.mjs';
 import {createAdminApi} from './admin-api.mjs';
+import {loadProductionPersona} from './production-persona.mjs';
 import {createAdminUiRoutes} from './admin-ui-routes.mjs';
 import {verifyVkLaunch,validatedVkName} from './vk-auth.mjs';
 import {recognizeVkVisitor} from './vk-relationships.mjs';
@@ -121,7 +122,7 @@ async function loadContext(env,today){
 }
 
 /** Injectable dependencies are for offline testing only; production uses bindings. */
-export function createSankoHandler({personaLoader=loadApprovedPersona,
+export function createSankoHandler({personaLoader=async env=>env?.STAGING_MODE==='true'?loadApprovedPersona(env):loadProductionPersona(env),
   contextLoader=loadContext,knowledgeLoader=async (env,question)=>
     readCanonicalEvidence({db:env.GUARD_DB,question}),modelFactory=env=>new GeminiAdapter({
     apiKey:env.GEMINI_API_KEY,model:env.GEMINI_MODEL}),
