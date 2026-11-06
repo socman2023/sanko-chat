@@ -56,6 +56,49 @@ jobs:
           cp -a sanko-rebuild-clean/.wrangler-dryrun-stage11/. compiled-worker/
           find compiled-worker -type f -maxdepth 3 -print
           test -n "$(find compiled-worker -type f -print -quit)"
+      - name: Smoke test the actual Worker in local Cloudflare runtime, no cloud access
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONFIG="$(node sanko-rebuild-clean/runtime/staging/make-dryrun-config.mjs)"
+          node sanko-rebuild-clean/runtime/staging/verify-staging.mjs "$CONFIG" --compile-only
+          sanko-rebuild-clean/node_modules/.bin/wrangler dev \
+            --config "$CONFIG" --local --port 8788 --ip 127.0.0.1 > /tmp/sanko-clean-dev.log 2>&1 &
+          WORKER_PID=$!
+          cleanup() { kill "$WORKER_PID" 2>/dev/null || true; rm -f "$CONFIG"; }
+          trap cleanup EXIT
+          ready=0
+          for n in $(seq 1 24); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8788/health -o /tmp/sanko-health.json; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then cat /tmp/sanko-clean-dev.log; exit 1; fi
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const health=JSON.parse(readFileSync('/tmp/sanko-health.json','utf8'));
+          assert.equal(health.status,'staging_only');
+          assert.equal(health.character,'sanko');
+          assert.equal(health.realGeminiEnabled,false);
+          const host='http://127.0.0.1:8788';
+          const admin=await fetch(host+'/admin/stats');
+          assert.equal(admin.status,200);
+          assert((await admin.text()).includes('data-page="stats"'));
+          const privateAdmin=await fetch(host+'/admin/stats/data',{
+            method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+          assert.equal(privateAdmin.status,401);
+          const session=await fetch(host+'/api/session',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({vkLaunch:'?vk_user_id=850667816&vk_app_id=54875852&sign=invalid'})});
+          assert.equal(session.status,200);
+          assert.equal((await session.json()).verified,false);
+          const chat=await fetch(host+'/api/chat',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({message:'Привет'})});
+          assert.equal(chat.status,503);
+          assert.equal((await chat.json()).error,'not_configured');
+          console.log('PASS: local Cloudflare runtime, health, admin UI, private data auth, forged VK, model gate');
+          NODE
       - name: Save compiled output for inspection
         uses: actions/upload-artifact@v4
         with:
