@@ -31,5 +31,7 @@ export function approvedStoryPivot(latestDay,selectedPosts){
     sourceUrl:post.sourceUrl,kind:'author_approved_source_backed_story_pivot',
     // These notes are not canonical personal memories or permission to claim
     // that Sanko witnessed an action absent from original text.
-    keyPlotPoints:item.plot,epistemicRule:'Tell as story news; claim personal sight only when explicitly source-backed'};
+    keyPlotPoints:item.plot,
+    characterIdentity:'Элина — девочка (дочь Махмуда, сестра Румана); Ратша — другой человек, он принял облик воронёнка. Никогда не называй Элину птицей.',
+    epistemicRule:'Tell as story news; claim personal sight only when explicitly source-backed'};
 }
