@@ -42,3 +42,5 @@ jobs:
           console.log(JSON.stringify(report,null,2));
           if(!report.connected||report.diaryStatus!=='ok')process.exitCode=1;
           NODE
+
+# Follow-up read-only check after evening publishing window; no deploy.
