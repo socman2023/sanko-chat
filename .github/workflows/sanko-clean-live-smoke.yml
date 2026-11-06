@@ -44,6 +44,7 @@ jobs:
               reply:reply.slice(0,1000),error:data.error||null,
               model:data.model||null,knowledge:data.knowledge||null}));
             if(!res.ok||!reply.trim())throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
+            if(/(?:птиц[а-яё]*[\\s,:–-]*Элин[а-яё]*|Элин[а-яё]*[\\s,:–-]*птиц[а-яё]*)/iu.test(reply))throw Error('Elina_wrongly_called_bird');
             if(!history.length){firstResponse=reply;if(!(/ратш/iu.test(reply)&&/элин/iu.test(reply)))throw Error('generic_whats_new_missed_main_rescue_recognition');}
             if(turn===1 && health.diarySync?.latestPostDay!==health.diarySync?.today &&
                 /(?:за весь день.{0,45}(?:нич|не видал)|ничего особенного|ничего не произошло|ничего не случилось)/iu.test(reply))
