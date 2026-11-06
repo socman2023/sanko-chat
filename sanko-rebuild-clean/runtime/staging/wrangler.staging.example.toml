@@ -1,0 +1,39 @@
+# NOT DEPLOYABLE UNTIL YOU CREATE DEDICATED STAGING RESOURCES.
+# Do not use the production D1 heroes-chat-sanko nor production shared KV.
+# Secrets are set in Cloudflare dashboard for THIS separate Worker only.
+name = "sanko-chat-next-staging"
+main = "../../runtime/index.mjs"
+compatibility_date = "2026-11-06"
+workers_dev = true
+keep_vars = false
+
+[vars]
+# Only approved origin; admin pages live on the Worker same origin.
+ALLOWED_ORIGIN = "https://socman2023.github.io"
+VK_APP_ID = "54875852"
+VK_OWNER_USER_ID = "1029851985"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+STAGING_MODE = "true"
+ENABLE_REAL_MODEL = "false"
+ENABLE_ADMIN_MUTATIONS = "false"
+ENABLE_CHRONICLE_SYNC = "false"
+ENABLE_CHRONICLE_EXTRACTION = "false"
+
+# The frontend may read this staging Worker only via an explicit preview link;
+# existing Pages config.js MUST NOT be altered before release approval.
+[[d1_databases]]
+binding = "GUARD_DB"
+database_name = "sanko-chat-next-test"
+database_id = "REPLACE_WITH_NEW_STAGING_D1_ID"
+migrations_dir = "migrations"
+
+# Use a separate read-only diary MIRROR in staging. Never point staging
+# at Oleshka's production database until a distinct explicit approval.
+[[d1_databases]]
+binding = "DIARY_DB"
+database_name = "sanko-chat-next-diary-mirror"
+database_id = "REPLACE_WITH_NEW_DIARY_MIRROR_D1_ID"
+
+[[kv_namespaces]]
+binding = "CURRENT_CONTEXT"
+id = "REPLACE_WITH_NEW_STAGING_KV_ID"

@@ -1,0 +1,11 @@
+{
+  "name": "sanko-clean-standalone-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test chronicle/tests/*.test.mjs engine/tests/*.test.mjs runtime/tests/*.test.mjs",
+    "test:canon": "python -m unittest discover -s tests -v",
+    "verify:canon": "python scripts/verify_canon.py --materials .."
+  },
+  "engines": {"node": ">=22"}
+}
