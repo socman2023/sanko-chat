@@ -8,6 +8,7 @@ import {ADMIN_HTML,ADMIN_CSS,ADMIN_SCRIPT} from './approved-admin-ui.mjs';
 
 const app=createSankoHandler({
   stagingMandatory:false,
+  productionHealth:true,
   adminUi:createAdminUiRoutes({html:ADMIN_HTML,css:ADMIN_CSS,js:ADMIN_SCRIPT})
 });
 export default {
