@@ -32,6 +32,8 @@ jobs:
         run: |
           node sanko-rebuild-clean/runtime/tools/attach-admin-ui.mjs worker/src/admin-ui.js
           node sanko-rebuild-clean/runtime/tools/check-worker-graph.mjs
+          npm --prefix sanko-rebuild-clean test
+          python3 sanko-rebuild-clean/runtime/staging/verify-migrations.py
           for f in sanko-rebuild-clean/runtime/*.mjs sanko-rebuild-clean/engine/*.mjs sanko-rebuild-clean/chronicle/*.mjs; do node --check "$f"; done
       - name: Install Wrangler in isolated source tree
         shell: bash
