@@ -1,0 +1,15 @@
+{
+  "synthetic_only": true,
+  "checkedAt": "2026-11-06T17:30:00.000Z",
+  "rows": [
+    {
+      "owner_id": 850667816,
+      "post_id": 900001,
+      "published_at": 1793980800,
+      "published_day_msk": "2026-11-06",
+      "source_url": "https://vk.ru/wall850667816_900001",
+      "category": "diary",
+      "source_text": "СИНТЕТИЧЕСКИЙ ПРИМЕР ДЛЯ ТЕСТА. Не является публикацией Олешки и не содержит канонических событий."
+    }
+  ]
+}
