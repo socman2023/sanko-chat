@@ -203,7 +203,7 @@ export function createSankoHandler({personaLoader=async env=>env?.STAGING_MODE==
         reply:result.ok?result.reply:'',model:result.ok?result.model:'',
         status:result.ok?'answered':'error'});
     }catch{return response({error:'log_storage_failed'},503,origin);}
-    if(!result.ok)return response({error:result.error},
+    if(!result.ok)return response({error:result.error,providerCode:result.diagnostic||null},
       result.error==='response_quality_failed'?422:503,origin);
     return response({conversationId:body.conversationId,reply:result.reply,
       model:result.model,knowledge:{latestPublicationDay:context.lastKnownPublicationDay,
