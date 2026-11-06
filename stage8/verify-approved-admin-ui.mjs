@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {ADMIN_HTML,ADMIN_CSS,ADMIN_SCRIPT} from '../worker/src/admin-ui.js';
+import {createAdminUiRoutes} from './admin-ui-routes.mjs';
 const file=readFileSync(new URL('../worker/src/admin-ui.js',import.meta.url));
 const sha=createHash('sha1').update('blob '+file.length).update(Buffer.from([0])).update(file).digest('hex');
 assert.equal(sha,'f54996b76062c58edbba8fff5a306e77c704d547',
@@ -27,3 +28,20 @@ console.log('APPROVED UI VERIFIED',JSON.stringify({
   cssLength:ADMIN_CSS.length,
   note:'This checks the approved UI only; no clean-worker deployment is performed.'
 }));
+
+const route=createAdminUiRoutes({html:ADMIN_HTML,css:ADMIN_CSS,js:ADMIN_SCRIPT});
+for(const page of ['stats','chats','knowledge','profile']){
+  const response=route(new Request('https://preview.invalid/admin/'+page));
+  assert.equal(response.status,200);
+  const body=await response.text();
+  assert(body.includes('data-page="'+page+'"'));
+  assert(body.includes('/admin/assets/style.css'));
+}
+for(const [path,expected] of [['/admin/assets/style.css',ADMIN_CSS],['/admin/assets/app.js',ADMIN_SCRIPT]]){
+  const response=route(new Request('https://preview.invalid'+path));
+  assert.equal(response.status,200);
+  assert.equal(await response.text(),expected,'Presentation asset was rewritten');
+}
+assert.equal(route(new Request('https://preview.invalid/admin/chats/list')),null,
+  'Protected JSON API must not be implemented by public presentation route');
+console.log('CLEAN ADMIN ROUTER + ORIGINAL HTML/CSS/JS: 4 pages and 2 assets verified');
