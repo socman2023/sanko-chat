@@ -4,7 +4,7 @@ on:
     branches:
       - build/sanko-clean-wrangler-check-20261107
     paths:
-      - buildpack/sanko-clean-stage11.tar.br
+      - sanko-rebuild-clean/**
       - .github/workflows/sanko-next-build-check.yml
   workflow_dispatch:
 permissions:
@@ -18,27 +18,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify archived clean source and unpack without network
+      - name: Verify checked-out clean source tree, no archive extraction
         shell: bash
         run: |
-          node --input-type=module <<'NODE'
-          import {readFileSync,writeFileSync} from 'node:fs';
-          import {createHash} from 'node:crypto';
-          import {brotliDecompressSync} from 'node:zlib';
-          const src=readFileSync('buildpack/sanko-clean-stage11.tar.br');
-          const actual=createHash('sha256').update(src).digest('hex');
-          const expected='f5f43e8283161226f254fed2f3088e3d5ef433be010bbb209e029905b593c126';
-          if(actual!==expected)throw Error('Unexpected clean source digest: '+actual);
-          writeFileSync('/tmp/sanko-clean-source.tar',brotliDecompressSync(src));
-          console.log('SOURCE VERIFIED',actual,'bytes',src.length);
-          NODE
-          tar -xf /tmp/sanko-clean-source.tar
           test -f sanko-rebuild-clean/runtime/index.mjs
+          test -f sanko-rebuild-clean/runtime/admin-readonly.mjs
+          test -f sanko-rebuild-clean/engine/conversation.mjs
+          test -f sanko-rebuild-clean/chronicle/live-snapshot.mjs
           test -f worker/src/admin-ui.js
+          echo 'PASS: clean Worker code is checked out directly from this isolated GitHub branch'
       - name: Inspect source integrity and attach byte-identical approved admin UI
         shell: bash
         run: |
           node sanko-rebuild-clean/runtime/tools/attach-admin-ui.mjs worker/src/admin-ui.js
+          node sanko-rebuild-clean/runtime/tools/check-worker-graph.mjs
           for f in sanko-rebuild-clean/runtime/*.mjs sanko-rebuild-clean/engine/*.mjs sanko-rebuild-clean/chronicle/*.mjs; do node --check "$f"; done
       - name: Install Wrangler in isolated source tree
         shell: bash
