@@ -10,7 +10,7 @@ const approvedPresentation=await import('./approved-admin-ui.mjs').catch(error=>
 });
 import {syncPersonalChronicle} from './chronicle-sync.mjs';
 import {GeminiAdapter} from '../engine/gemini-adapter.mjs';
-const chat=createSankoHandler({stagingMandatory:false,adminUi:createAdminUiRoutes(approvedPresentation?{
+const chat=createSankoHandler({stagingMandatory:true,adminUi:createAdminUiRoutes(approvedPresentation?{
   html:approvedPresentation.ADMIN_HTML,
   css:approvedPresentation.ADMIN_CSS,
   js:approvedPresentation.ADMIN_SCRIPT
