@@ -31,7 +31,7 @@ jobs:
           const history=[],conversationId=crypto.randomUUID();
           let hasKeyEvent=false;
           let firstResponse='';
-          for(const message of ['А что у вас нового? Расскажи главное событие из последней записи Олешки.', 'Ты серьёзно? Какое именно важное событие произошло?', 'А что было вчера — чем завершился день?']){
+          for(const message of ['А у тебя что нового?', 'Расскажи, что сегодня было.', 'Какое важное событие произошло?']){
             const res=await fetch(root+'/api/chat',{
               method:'POST',signal:AbortSignal.timeout(65000),
               headers:{'Origin':'https://socman2023.github.io','Content-Type':'application/json'},
@@ -43,7 +43,7 @@ jobs:
               reply:reply.slice(0,1000),error:data.error||null,
               model:data.model||null,knowledge:data.knowledge||null}));
             if(!res.ok||!reply.trim())throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
-            if(!history.length)firstResponse=reply;
+            if(!history.length){firstResponse=reply;if(!(/ратш/iu.test(reply)&&/элин/iu.test(reply)))throw Error('generic_whats_new_missed_main_rescue_recognition');}
             if(/ратш/iu.test(reply)&&/элин/iu.test(reply))hasKeyEvent=true;
             history.push({role:'user',text:message},{role:'model',text:reply});
           }
