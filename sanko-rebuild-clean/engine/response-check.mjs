@@ -21,5 +21,9 @@ export function checkSankoResponse(text,{maxChars=3200}={}) {
       reasons.push(`noncanonical_form:${wrong}:${expected}`);
   }
   // Do not mutate reply even if it fails. Semantic fidelity is a separate test.
-  return {ok:reasons.length===0,reasons};
+  // A rare standard word is a speech-quality warning, not a reason to
+  // throw away the entire paid Gemini reply and show a 422 to the reader.
+  // Dangerous/meta/calendar failures remain hard rejects. No second call.
+  const blocking=reasons.filter(r=>!r.startsWith('noncanonical_form:'));
+  return {ok:blocking.length===0,reasons,blocking};
 }
