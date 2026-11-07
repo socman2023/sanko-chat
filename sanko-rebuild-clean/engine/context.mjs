@@ -26,7 +26,7 @@ function asksForRecentNews(message,history){
 }
 
 const WORDS=new Set(['этого','когда','какой','который','почему','расскажи','помнишь',
-  'кто','были','потом','сегодня','вчера','нового','скажешь','скажи','пожалуйста']);
+  'кто','твой','твоя','твои','были','потом','сегодня','вчера','нового','скажешь','скажи','пожалуйста']);
 const topicTerms=message=>[...new Set((message.toLowerCase().match(/[\p{L}]{4,}/gu)||[])
   .filter(x=>!WORDS.has(x)))].slice(0,8);
 function evidenceScore(text,terms){
@@ -78,17 +78,21 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
   const effectiveBudget=recentNews&&maxInputChars===DEFAULT_MAX_INPUT_CHARS?16_000:maxInputChars;
   const charsOther=message.length+messages.reduce((s,h)=>s+h.text.length,0);
   const newsEvidence=recentNews?newsEvidenceFromPosts(context.sourcePosts||[],
-    {maxQuotes:3,maxChars:1100}):null;
+    {maxQuotes:2,maxChars:760}):null;
+  const personQuestion=/(?:кто такой|кто такая|кто твой|кто твоя|твоего отца|твоей матери|расскажи (?:о|про) |твоя семья|твоё детство)/iu.test(message);
   const sourceRows=evidence.sourcePosts.map(p=>({
     postId:p.postId,sourceUrl:p.sourceUrl,publicationDay:p.publishedDay,
     text:p.fullSourceText,scope:'author_diary_not_automatically_sanko_memory'
   }));
+  const candidateSourceRows=recentNews?sourceRows:
+    (personQuestion?[]:sourceRows.filter(row=>evidenceScore(row.text,
+      topicTerms(message))>0));
   const canonRows=Array.isArray(knowledge?.hits)?knowledge.hits:[];
   const terms=topicTerms(message);
   // The source and canon retrievers each supply their own authoritative
   // chronology/priority. Relevance merely decides what fits in the packet.
   const choices=[
-    ...sourceRows.map((row,i)=>({type:'source',value:row,index:i,
+    ...candidateSourceRows.map((row,i)=>({type:'source',value:row,index:i,
       relevance:evidenceScore(row.text,terms)+
       (recentNews&&row.publicationDay===latestSourceDay?1000:0)+
       (recentNews&&row.publicationDay===latestSourceDay&&row.text.length>=400?500:0),
@@ -111,8 +115,8 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
     historicalCanonWarning:'Historical corpus cannot override newer approved author/diary facts.',
     sourceRecords:sources,
     sourceReadComplete:evidence.sourceStatus==='read_complete',
-    availableSourceSelectionComplete:!evidence.moreSourcesAvailable && sources.length===sourceRows.length,
-    knowledgeLimitReached:evidence.moreSourcesAvailable||sources.length<sourceRows.length,
+    availableSourceSelectionComplete:!evidence.moreSourcesAvailable && sources.length===candidateSourceRows.length,
+    knowledgeLimitReached:(recentNews&&evidence.moreSourcesAvailable)||sources.length<candidateSourceRows.length,
     availableCanonSelectionComplete:canon.length===canonRows.length,
     lastKnownPublicationDay:context.lastKnownPublicationDay
   });
@@ -148,9 +152,9 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
   }
   return {ok:true,system,messages,message,
     approxInputChars:system.length+charsOther,sourceTextChars:sourceChars,
-    includedSourceCount:chosenPosts.length,omittedSourceCount:sourceRows.length-chosenPosts.length,
+    includedSourceCount:chosenPosts.length,omittedSourceCount:candidateSourceRows.length-chosenPosts.length,
     includedCanonCount:chosenCanon.length,omittedCanonCount:canonRows.length-chosenCanon.length,
-    moreSourcesAvailable:evidence.moreSourcesAvailable||chosenPosts.length<sourceRows.length,
+    moreSourcesAvailable:(recentNews&&evidence.moreSourcesAvailable)||chosenPosts.length<candidateSourceRows.length,
     inputBudgetChars:effectiveBudget,providerIndependent:true,
     recentNewsFocus:recentNews,
     includedSourcePostIds:chosenPosts.map(p=>p.postId),
