@@ -43,7 +43,7 @@ jobs:
             const m=data.contextMetrics||{};
             console.log('qa',JSON.stringify({
               case:item.name,http:response.status,
-              reply:data.reply||null,error:data.error||null,
+              reply:data.reply||null,error:data.error||null,providerCode:data.providerCode||null,
               inputTokens:m.inputTokens,totalTokens:m.totalTokens,
               fullProfileChars:m.approvedProfileFullChars,
               profileCharsSent:m.approvedProfileSelectedChars,
