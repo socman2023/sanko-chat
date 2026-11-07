@@ -36,8 +36,8 @@ test('latest-day key rescue news survives older props and midnight roll-over',as
   assert(prompt.includedSourcePostIds.includes(32259));
   assert(prompt.system.includes(narrative));
   assert.match(prompt.system,/"newsEvidenceQuotes":/);
-  assert.match(prompt.system,/"mentionedPeople":\\[[^\\]]*"Махмуд"/);
-  assert.match(prompt.system,/"mentionedPeople":\\[[^\\]]*"Элина"/);
+  assert(prompt.system.includes('"mentionedPeople":["Ратша","Махмуд","Руман","Элина"'));
+  assert(prompt.system.includes('"Махмуд","Руман","Элина"'));
   assert.match(prompt.system,/"verifiedLiteral":true/);
   assert.match(prompt.system,/"focusDayMatchesToday":false/);
   assert.match(prompt.system,/Определи главное событие не по яркости детали/);
