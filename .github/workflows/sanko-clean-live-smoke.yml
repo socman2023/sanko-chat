@@ -1,4 +1,4 @@
-name: Sanko live acceptance: complete profile with small prompt
+name: Sanko live acceptance - complete profile with small prompt
 on:
   push:
     branches: [audit/sanko-clean-live-smoke-20261107]
