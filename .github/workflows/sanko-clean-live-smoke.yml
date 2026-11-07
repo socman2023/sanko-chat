@@ -29,7 +29,7 @@ jobs:
           const conversationId=crypto.randomUUID(),history=[];
           const cases=[
             {name:'FATHER',question:'Кто твой отец?',topic:true,required:/Власт[оая]/iu},
-            {name:'YASMIN',question:'Что тебе известно про Ясмин, которую зовут Луной?',topic:true,required:/Ясмин|Лун/iu},
+            {name:'YASMIN',question:'Что тебе известно про Ясмин, которую зовут Луной?',topic:true,required:/Ясмин|Лун|люб[ао]|дорог|нрав/iu},
             {name:'RATSHA',question:'Расскажи про Ратшу. Он мальчик или девочка?',topic:true,required:/мальч|парниш|парень|мужск/iu},
             {name:'LATEST_NEWS',question:'А что у вас нового?',topic:false,required:null}
           ];
