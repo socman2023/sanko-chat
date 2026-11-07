@@ -177,7 +177,7 @@ export function createSankoHandler({personaLoader=async env=>env?.STAGING_MODE==
     let persona,context,knowledge;
     const day=dayMsk(now());
     try {
-      persona=await personaLoader(env);
+      persona=await personaLoader(env,body.message,body.history);
       if(!persona?.approved)return response({error:'profile_not_approved'},503,origin);
       context=await contextLoader(env,day);
       knowledge=await knowledgeLoader(env,body.message);
@@ -206,7 +206,15 @@ export function createSankoHandler({personaLoader=async env=>env?.STAGING_MODE==
     if(!result.ok)return response({error:result.error,providerCode:result.diagnostic||null},
       result.error==='response_quality_failed'?422:503,origin);
     return response({conversationId:body.conversationId,reply:result.reply,
-      model:result.model,knowledge:{latestPublicationDay:context.lastKnownPublicationDay,
+      model:result.model,
+      contextMetrics:{inputTokens:Number.isSafeInteger(result.usage?.promptTokenCount)?
+        result.usage.promptTokenCount:null,
+        totalTokens:Number.isSafeInteger(result.usage?.totalTokenCount)?
+          result.usage.totalTokenCount:null,
+        inputChars:result.approxInputChars||null,
+        approvedProfileFullChars:persona.profileSelection?.fullChars||null,
+        approvedProfileSelectedChars:persona.profileSelection?.selectedChars||0},
+      knowledge:{latestPublicationDay:context.lastKnownPublicationDay,
         todayHasVerifiedPersonalFacts:context.hasVerifiedTodayEvents}},200,origin);
   }};
 }
