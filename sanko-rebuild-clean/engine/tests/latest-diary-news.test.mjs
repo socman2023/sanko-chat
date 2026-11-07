@@ -35,8 +35,8 @@ test('latest-day key rescue news survives older props and midnight roll-over',as
   assert.equal(prompt.latestSourceDayIncluded,true);
   assert(prompt.includedSourcePostIds.includes(32259));
   assert(prompt.system.includes(narrative));
-  assert.match(prompt.system,/"kind":"author_approved_source_backed_story_pivot"/);
-  assert.match(prompt.system,/Элина узнала Ратшу и подала знак/);
+  assert.match(prompt.system,/"newsEvidenceQuotes":/);
+  assert.match(prompt.system,/"verifiedLiteral":true/);
   assert.match(prompt.system,/"focusDayMatchesToday":false/);
   assert.match(prompt.system,/Ищи, что изменилось для героев/);
 });
@@ -65,24 +65,28 @@ test('latest-day news answer does not convert publication timestamp into eyewitn
   assert.match(x.system,/от первого лица свидетеля говори только если/);
 });
 
-test('author-approved 6 Nov headline never overrides later diary day',async()=>{
+test('new future day takes priority automatically with zero hardcoded story IDs',async()=>{
   const old=await makePost(32259,'2026-11-06',narrative);
-  const fresh=await makePost(32500,'2026-11-07','Сегодня совсем новые события в городе; события подтверждены этой записью.'.repeat(12));
-  const ctx=buildCurrentContext({today:'2026-11-07',posts:[old,fresh],
+  const latest=await makePost(32500,'2026-11-07',
+    'Нашли потерявшегося путника живым. Местные жители обрадовались и привели его домой. '.repeat(12));
+  const ctx=buildCurrentContext({today:'2026-11-07',posts:[old,latest],
     maxSourcePosts:6,sourceReadComplete:true});
   const out=composePrompt({persona,context:ctx,message:'А что нового?'});
   assert(out.ok);
+  assert.match(out.system,/потерявшегося путника/);
   assert(!out.system.includes('author_approved_source_backed_story_pivot'));
+  assert(!out.system.includes('keyEventEvidence'));
 });
-test('editorial plot cue is withheld unless specific source mentions all three people',async()=>{
-  const fake=await makePost(32259,'2026-11-06','На дороге видели повозку, и больше ничего не произошло.'.repeat(15));
-  const ctx=buildCurrentContext({today:'2026-11-07',posts:[fake],
+test('news evidence reflects actual source and cannot approve a fabricated story',async()=>{
+  const latest=await makePost(32501,'2026-11-07',
+    'Нашли мальчика среди сосен. Он был жив и невредим. По дороге обратно развалилось колесо.'.repeat(10));
+  const ctx=buildCurrentContext({today:'2026-11-07',posts:[latest],
     maxSourcePosts:6,sourceReadComplete:true});
   const out=composePrompt({persona,context:ctx,message:'Что нового?'});
   assert(out.ok);
+  assert.match(out.system,/newsEvidenceQuotes/);
   assert(!out.system.includes('author_approved_source_backed_story_pivot'));
 });
-
 test('after-midnight today query must not claim that no event happened today',async()=>{
   const p=await makePost(32259,'2026-11-06',narrative);
   const ctx=buildCurrentContext({today:'2026-11-07',posts:[p],
@@ -93,5 +97,5 @@ test('after-midnight today query must not claim that no event happened today',as
   assert.match(out.system,/Достоверных сведений о событиях именно сегодняшнего дня НЕТ/);
   assert.match(out.system,/НЕ МОЖЕШЬ говорить/);
   assert.match(out.system,/Не выдавай вчерашнюю историю за сегодняшнюю/);
-  assert.match(out.system,/Элина узнала Ратшу и подала знак/);
+  assert.match(out.system,/newsEvidenceQuotes/);
 });
