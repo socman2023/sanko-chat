@@ -1,0 +1,34 @@
+name: Sanko full profile and input budget - real build validation
+on:
+  push:
+    branches: [fix/sanko-full-profile-budget-events-20261107]
+    paths:
+      - 'sanko-rebuild-clean/**'
+      - '.github/workflows/sanko-full-profile-budget.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run ALL isolated conversation tests
+        run: |
+          npm --prefix sanko-rebuild-clean test
+          node sanko-rebuild-clean/runtime/tests/approved-full-profile.test.mjs
+      - name: Ensure one-off news code is GONE
+        run: |
+          test ! -e sanko-rebuild-clean/engine/approved-news-evidence.mjs
+          ! grep -R -l 'approvedStoryPivot' sanko-rebuild-clean/engine --include='*.mjs'
+          ! grep -R -l '32259' sanko-rebuild-clean/engine --exclude-dir=tests --include='*.mjs'
+      - name: Compile new production entry with Wrangler
+        run: |
+          npm install --prefix sanko-rebuild-clean --no-save --no-package-lock wrangler@4
+          npx --yes --prefix sanko-rebuild-clean wrangler deploy --config wrangler.toml --dry-run --outdir /tmp/sanko-profile-compile
+          test -n "$(find /tmp/sanko-profile-compile -type f -print -quit)"
+          echo 'PASS: strict budgets, original KV source and generic news engine compile'
