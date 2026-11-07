@@ -38,7 +38,7 @@ test('latest-day key rescue news survives older props and midnight roll-over',as
   assert.match(prompt.system,/"newsEvidenceQuotes":/);
   assert.match(prompt.system,/"verifiedLiteral":true/);
   assert.match(prompt.system,/"focusDayMatchesToday":false/);
-  assert.match(prompt.system,/Ищи, что изменилось для героев/);
+  assert.match(prompt.system,/Определи главное событие не по яркости детали/);
 });
 test('correction followup keeps primary news instead of repeating old background props',async()=>{
   const p=await makePost(32259,'2026-11-06',narrative);
