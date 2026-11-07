@@ -70,7 +70,11 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
     'Если за календарный сегодняшний день записей ещё нет, не выдавай вчерашнюю запись за сегодняшнюю: расскажи о последних известных событиях с естественной оговоркой.',
     'В разговоре об актуальных событиях допустимы 2–3 короткие фразы, чтобы назвать главное событие и его последствия. Не подменяй ответ привычным возгласом или повторной присказкой.'
   ].join('\n');
-  const messages=stableHistory(history);
+  // An explicit new question about recent events resets irrelevant biographical
+  // dialogue in the MODEL packet, not the user's saved conversation history.
+  // This prevents an old exchange about family or friends from outweighing
+  // verified current diary evidence, and saves tokens.
+  const messages=RECENT_NEWS.test(message)?[]:stableHistory(history);
   const recentNews=recentThread;
   const latestSourceDay=context.lastKnownPublicationDay||null;
   const asksAboutToday=/(?:сегодня|нынче|нынешн|сей день|этот день)/iu.test(message);
@@ -134,6 +138,8 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
     :recentNews?
       '\n\n### ФОКУС ЭТОГО ОТВЕТА\n'+
       'ПЕРВОИСТОЧНИК: '+(newsEvidence?.quotes?.[0]?.text||'Нет достаточно сильной подтверждённой выдержки.')+'\\n'+
+      'Названные в приоритетных выдержках люди: '+(newsEvidence?.mentionedPeople?.join(', ')||'не установлены')+'. '+
+
       'Определи по этой дословной выдержке, какие действующие лица достигли цели и какие именно люди найдены, встречены или спасены. '+
       'Если источник перечисляет группу из нескольких людей, назови ВСЕХ участников этой группы, а не только одного или двух. '+
       'На первом месте итог основной цели; знак узнавания и препятствия — после него. '+
