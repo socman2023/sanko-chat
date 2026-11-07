@@ -42,7 +42,7 @@ test('loopback HTTP: chat, conversation history, CORS and admin denial',async t=
   assert.equal(h.status,200);
   assert.equal((await h.json()).diarySync.status,'read_error');
   let conversationId;
-  for(const msg of ['Здрав будь!','А у тебя шо нового?','А сегодня?']){
+  for(const msg of ['Здрав будь!','А у тебя шо нового?','А сегодня?','А почему?']){
     const r=await fetch(address+'/api/chat',{method:'POST',headers,
       body:JSON.stringify({message:msg,history,conversationId})});
     assert.equal(r.status,200,await r.clone().text());
@@ -51,8 +51,11 @@ test('loopback HTTP: chat, conversation history, CORS and admin denial',async t=
     conversationId=v.conversationId;
     history.push({role:'user',text:msg},{role:'model',text:v.reply});
   }
-  assert.equal(calls,3);
-  assert.equal(captured[2].history.length,4);
+  assert.equal(calls,4);
+  assert.equal(captured[2].history.length,0,
+    'Explicit news question must ignore irrelevant old turns in the model packet');
+  assert.equal(captured[3].history.length,6,
+    'Non-news followup must still retain prior conversational context');
   const forbidden=await fetch(address+'/admin/chats/list',{method:'POST',
     headers:{...headers,Origin:'https://evil.example'},
     body:'{}'});
