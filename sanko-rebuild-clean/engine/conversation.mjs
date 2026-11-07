@@ -4,7 +4,7 @@ import {checkSankoResponse} from './response-check.mjs';
 
 export async function answerAsSanko({model,persona,context,knowledge=null,history=[],message,
   confirmedOleshka=false,allowUnapprovedForTest=false,
-  sourceCharBudget=20_000,maxInputChars=24_000}={}) {
+  sourceCharBudget=9_000,maxInputChars=15_000}={}) {
   if(!model || typeof model.generate!=='function')throw new TypeError('missing_model_adapter');
   if(!persona?.approved && !allowUnapprovedForTest)
     return {ok:false,error:'persona_not_approved',providerCalls:0};
