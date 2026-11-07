@@ -122,7 +122,7 @@ async function loadContext(env,today){
 }
 
 /** Injectable dependencies are for offline testing only; production uses bindings. */
-export function createSankoHandler({personaLoader=async env=>env?.STAGING_MODE==='true'?loadApprovedPersona(env):loadProductionPersona(env),
+export function createSankoHandler({personaLoader=async (env,message,history)=>env?.STAGING_MODE==='true'?loadApprovedPersona(env):loadProductionPersona(env,message,history),
   contextLoader=loadContext,knowledgeLoader=async (env,question)=>
     readCanonicalEvidence({db:env.GUARD_DB,question}),modelFactory=env=>new GeminiAdapter({
     apiKey:env.GEMINI_API_KEY,model:env.GEMINI_MODEL}),
