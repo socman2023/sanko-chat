@@ -80,7 +80,7 @@ export function composePrompt({persona,context,knowledge=null,history=[],message
   const newsEvidence=recentNews?newsEvidenceFromPosts(context.sourcePosts||[],
     {maxQuotes:3,maxChars:1100}):null;
   const sourceRows=evidence.sourcePosts.map(p=>({
-    sourceUrl:p.sourceUrl,publicationDay:p.publishedDay,
+    postId:p.postId,sourceUrl:p.sourceUrl,publicationDay:p.publishedDay,
     text:p.fullSourceText,scope:'author_diary_not_automatically_sanko_memory'
   }));
   const canonRows=Array.isArray(knowledge?.hits)?knowledge.hits:[];
