@@ -63,6 +63,9 @@ export function newsEvidenceFromPosts(posts,{maxQuotes=3,maxChars=1200}={}){
     if(used+candidate.text.length>maxChars)continue;
     selected.push(candidate);used+=candidate.text.length;
   }
-  return {sourceDay:day||null,quotes:selected,selectedChars:used,
-    sourceStatus:'verbatim_excerpt_not_authored_event_or_sanko_memory'};
+  const mentionedPeople=[...new Set(selected.flatMap(x=>
+    [...x.text.matchAll(/(?:^|[^\\p{L}])([А-ЯЁ][а-яё]{2,})/gu)]
+      .map(m=>m[1]).filter(name=>!unnamed.has(name))))].slice(0,10);
+  return {sourceDay:day||null,quotes:selected,mentionedPeople,
+    selectedChars:used,sourceStatus:'verbatim_excerpt_not_authored_event_or_sanko_memory'};
 }
