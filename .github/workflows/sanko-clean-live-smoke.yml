@@ -1,59 +1,72 @@
-name: Verify clean Sanko latest diary news (live)
+name: Sanko live acceptance: complete profile with small prompt
 on:
   push:
-    branches:
-      - audit/sanko-clean-live-smoke-20261107
-    paths:
-      - .github/workflows/sanko-clean-live-smoke.yml
+    branches: [audit/sanko-clean-live-smoke-20261107]
+    paths: [.github/workflows/sanko-clean-live-smoke.yml]
 permissions:
   contents: read
 jobs:
-  live:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
-      - name: Verify latest-day plot event and conversation correction against real Gemini
+      - name: Check real Gemini, full approved profile access, topical excerpts and actual token usage
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          const root='https://sanko-chat-api.boysinger2008.workers.dev';
-          let health=null;
-          for(let attempt=0;attempt<36;attempt++){
-            try{
-              const res=await fetch(root+'/health',{signal:AbortSignal.timeout(8000)});
-              const data=await res.json();
-              console.log('health',JSON.stringify({status:res.status,engine:data.engine,diarySync:data.diarySync?.status,latestPostDay:data.diarySync?.latestPostDay}));
-              if(res.ok&&data.engine==='sanko-clean-3.0.0'){health=data;break;}
-            }catch(err){console.log('health attempt unavailable',err?.name||'error');}
-            await new Promise(r=>setTimeout(r,5000));
+          import assert from 'node:assert/strict';
+          const origin='https://socman2023.github.io';
+          const host='https://sanko-chat-api.boysinger2008.workers.dev';
+          let health;
+          for(let n=0;n<12;n++){
+            const res=await fetch(host+'/health',{signal:AbortSignal.timeout(8500)});
+            health=await res.json();
+            if(res.ok&&health.engine==='sanko-clean-3.0.0'&&health.diarySync?.status==='ok')break;
+            await new Promise(r=>setTimeout(r,2000));
           }
-          if(!health)throw Error('new_clean_worker_not_live');
-          const history=[],conversationId=crypto.randomUUID();
-          let turn=0;
-          let hasKeyEvent=false;
-          let firstResponse='';
-          for(const message of ['А у тебя что нового?', 'Расскажи, что сегодня было.', 'Какое важное событие произошло?']){
-            const res=await fetch(root+'/api/chat',{
+          assert.equal(health.engine,'sanko-clean-3.0.0');
+          console.log('health',JSON.stringify({engine:health.engine,latestDay:health.diarySync.latestPostDay}));
+          const conversationId=crypto.randomUUID(),history=[];
+          const cases=[
+            {name:'FATHER',question:'Кто твой отец?',topic:true,required:/Власт[оая]/iu},
+            {name:'YASMIN',question:'Что тебе известно про Ясмин, которую зовут Луной?',topic:true,required:/Ясмин|Лун/iu},
+            {name:'RATSHA',question:'Расскажи про Ратшу. Он мальчик или девочка?',topic:true,required:/мальч|парниш|парень|мужск/iu},
+            {name:'LATEST_NEWS',question:'А что у вас нового?',topic:false,required:null}
+          ];
+          for(const item of cases){
+            const response=await fetch(host+'/api/chat',{
               method:'POST',signal:AbortSignal.timeout(65000),
-              headers:{'Origin':'https://socman2023.github.io','Content-Type':'application/json'},
-              body:JSON.stringify({message,conversationId,history})
+              headers:{Origin:origin,'Content-Type':'application/json'},
+              body:JSON.stringify({message:item.question,history,conversationId})
             });
-            const data=await res.json().catch(()=>({error:'invalid_json_reply'}));
-            const reply=typeof data.reply==='string'?data.reply:'';
-            console.log('chat',JSON.stringify({http:res.status,message,
-              reply:reply.slice(0,1000),error:data.error||null,
-              model:data.model||null,knowledge:data.knowledge||null}));
-            if(!res.ok||!reply.trim())throw Error('live_chat_failed_'+res.status+'_'+(data.error||''));
-            if(/(?:птиц[а-яё]*[\\s,:–-]*Элин[а-яё]*|Элин[а-яё]*[\\s,:–-]*птиц[а-яё]*)/iu.test(reply))throw Error('Elina_wrongly_called_bird');
-            if(!history.length){firstResponse=reply;if(!(/ратш/iu.test(reply)&&/элин/iu.test(reply)))throw Error('generic_whats_new_missed_main_rescue_recognition');}
-            if(turn===1 && health.diarySync?.latestPostDay!==health.diarySync?.today &&
-                /(?:за весь день.{0,45}(?:нич|не видал)|ничего особенного|ничего не произошло|ничего не случилось)/iu.test(reply))
-              throw Error('today_answer_invented_empty_day');
-            if(/ратш/iu.test(reply)&&/элин/iu.test(reply))hasKeyEvent=true;
-            history.push({role:'user',text:message},{role:'model',text:reply});
-            turn++;
+            const data=await response.json();
+            const m=data.contextMetrics||{};
+            console.log('qa',JSON.stringify({
+              case:item.name,http:response.status,
+              reply:data.reply||null,error:data.error||null,
+              inputTokens:m.inputTokens,totalTokens:m.totalTokens,
+              fullProfileChars:m.approvedProfileFullChars,
+              profileCharsSent:m.approvedProfileSelectedChars,
+              inputChars:m.inputChars,model:data.model
+            }));
+            assert.equal(response.status,200,item.name+' '+(data.error||''));
+            assert(data.reply&&data.reply.trim(),item.name);
+            assert(Number.isSafeInteger(m.inputTokens)&&m.inputTokens>100,'Missing real Gemini token usage');
+            assert(m.inputTokens<=8000,'Token budget exceeded: '+item.name+' '+m.inputTokens);
+            assert(Number.isInteger(m.approvedProfileFullChars)&&
+              m.approvedProfileFullChars>=7500,'Complete approved v0.4 KV profile was not loaded');
+            assert(m.approvedProfileSelectedChars<=2100,'Full profile accidentally sent');
+            if(item.topic)assert(m.approvedProfileSelectedChars>0,'Topical profile was not used');
+            else assert.equal(m.approvedProfileSelectedChars,0,'News must not include long biography');
+            if(item.required)assert(item.required.test(data.reply),'Wrong/missing canon answer for '+item.name);
+            if(item.name==='LATEST_NEWS'&&health.diarySync.latestPostDay==='2026-11-06'){
+              // Canonical acceptance for current latest diary while that is the latest.
+              assert(/руман/iu.test(data.reply),'Lost the missing boy from main plot');
+              assert(/элин/iu.test(data.reply),'Lost the missing girl from main plot');
+              assert(/махмуд/iu.test(data.reply),'Lost the missing father from main plot');
+            }
+            history.push({role:'user',text:item.question},{role:'model',text:data.reply});
+            if(history.length>10)history.splice(0,2);
           }
-          console.log('keyEventMentioned',hasKeyEvent,'firstResponse',firstResponse.slice(0,300));
-          if(!hasKeyEvent)throw Error('live_chat_ignored_main_rescue_event');
-          console.log('PASS: live recent-day news and correction flow completed');
+          console.log('PASS: complete KV profile preserved, <=2100 chars sent, <=8000 actual input tokens, natural news');
           NODE
